@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Fzf } from "fzf";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tauriInvoke } from "@/lib/tauri";
 import type { FileEntry } from "@/types/fs";
 
@@ -15,7 +16,10 @@ interface UseSearchResult {
 	clear: () => void;
 }
 
-export function useSearch(currentPath: string, localEntries: FileEntry[]): UseSearchResult {
+export function useSearch(
+	currentPath: string,
+	localEntries: FileEntry[],
+): UseSearchResult {
 	const [query, setQueryRaw] = useState("");
 	const [mode, setMode] = useState<SearchMode>("filter");
 	const [deepResults, setDeepResults] = useState<FileEntry[]>([]);
@@ -25,28 +29,40 @@ export function useSearch(currentPath: string, localEntries: FileEntry[]): UseSe
 
 	const isActive = query.trim().length > 0;
 
+	// Fuzzy finder for local entries
+	const fzf = useMemo(() => {
+		return new Fzf(localEntries, {
+			selector: (item) => item.name,
+			tiebreakers: [
+				(a, b) => {
+					// Prioritize folders over files if scores are tied
+					if (a.item.is_dir && !b.item.is_dir) return -1;
+					if (!a.item.is_dir && b.item.is_dir) return 1;
+					return 0;
+				},
+			],
+		});
+	}, [localEntries]);
+
 	// Deep search via Rust backend (debounced)
-	const runDeepSearch = useCallback(
-		async (q: string, root: string) => {
-			if (!q.trim()) return;
-			abortRef.current = false;
-			setIsSearching(true);
-			try {
-				const res = await tauriInvoke<FileEntry[]>("search_entries", {
-					root,
-					query: q.trim(),
-				});
-				if (!abortRef.current) {
-					setDeepResults(res);
-				}
-			} catch (e) {
-				console.error("Search error:", e);
-			} finally {
-				if (!abortRef.current) setIsSearching(false);
+	const runDeepSearch = useCallback(async (q: string, root: string) => {
+		if (!q.trim()) return;
+		abortRef.current = false;
+		setIsSearching(true);
+		try {
+			const res = await tauriInvoke<FileEntry[]>("search_entries", {
+				root,
+				query: q.trim(),
+			});
+			if (!abortRef.current) {
+				setDeepResults(res);
 			}
-		},
-		[]
-	);
+		} catch (e) {
+			console.error("Search error:", e);
+		} finally {
+			if (!abortRef.current) setIsSearching(false);
+		}
+	}, []);
 
 	useEffect(() => {
 		if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -91,13 +107,30 @@ export function useSearch(currentPath: string, localEntries: FileEntry[]): UseSe
 	};
 
 	// Compute results
-	const results: FileEntry[] = isActive
-		? mode === "filter"
-			? localEntries.filter((e) =>
-					e.name.toLowerCase().includes(query.toLowerCase())
-			  )
-			: deepResults
-		: localEntries;
+	const results = useMemo(() => {
+		if (!isActive) return localEntries;
 
-	return { query, setQuery, isSearching, isActive, mode, setMode, results, clear };
+		if (mode === "filter") {
+			return fzf.find(query).map((res) => res.item);
+		}
+
+		// For deep search, we still do fuzzy on the results returned from backend
+		// but since deep search backend usually already filters, we just sort them
+		const deepFzf = new Fzf(deepResults, {
+			selector: (item) => item.name,
+		});
+		return deepFzf.find(query).map((res) => res.item);
+	}, [isActive, mode, localEntries, fzf, query, deepResults]);
+
+	return {
+		query,
+		setQuery,
+		isSearching,
+		isActive,
+		mode,
+		setMode,
+		results,
+		clear,
+	};
 }
+

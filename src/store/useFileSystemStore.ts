@@ -25,6 +25,7 @@ interface FileSystemState {
 	error: string | null;
 	history: string[];
 	historyIndex: number;
+	homePath: string;
 
 	// Selection
 	selectedPaths: Set<string>;
@@ -45,6 +46,7 @@ interface FileSystemState {
 	deleteEntries: (paths: string[]) => Promise<void>;
 	pasteClipboard: () => Promise<void>;
 	createDirectory: (name: string) => Promise<void>;
+	setHomePath: (path: string) => void;
 }
 
 export const useFileSystemStore = create<FileSystemState>((set, get) => ({
@@ -54,8 +56,11 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
 	error: null,
 	history: [],
 	historyIndex: -1,
+	homePath: "",
 	selectedPaths: new Set(),
 	clipboard: null,
+
+	setHomePath: (path) => set({ homePath: path }),
 
 	selectEntry: (path, multi) => {
 		const { selectedPaths } = get();
@@ -68,12 +73,8 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
 			}
 			set({ selectedPaths: next });
 		} else {
-			if (selectedPaths.size === 1 && selectedPaths.has(path)) {
-				// clicking already-selected single item deselects
-				set({ selectedPaths: new Set() });
-			} else {
-				set({ selectedPaths: new Set([path]) });
-			}
+			// Always select, don't toggle off if already selected
+			set({ selectedPaths: new Set([path]) });
 		}
 	},
 

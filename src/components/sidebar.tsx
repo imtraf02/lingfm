@@ -1,43 +1,60 @@
-import { useEffect, useState } from "react";
 import {
-	homeDir,
+	audioDir,
 	desktopDir,
-	downloadDir,
 	documentDir,
+	downloadDir,
+	homeDir,
 	pictureDir,
 	videoDir,
-	audioDir,
 } from "@tauri-apps/api/path";
 import {
-	Home,
-	Download,
-	Monitor,
-	FileText,
-	Image,
-	Video,
-	Music,
-	Star,
-	Network,
-	Trash2,
-	ChevronDown,
-	ChevronRight,
 	Bookmark,
-	X,
+	ChevronDown,
+	ChevronLeft,
+	ChevronRight,
+	Download,
+	Ellipsis,
+	FileText,
+	Home,
+	Image,
+	Monitor,
+	Music,
+	Network,
+	Trash,
+	Trash2,
+	Video,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useFileSystemStore } from "@/store/useFileSystemStore";
 import { useSidebarStore } from "@/store/useSidebarStore";
+import { Button } from "./ui/button";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "./ui/collapsible";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuGroup,
+	ContextMenuItem,
+	ContextMenuTrigger,
+} from "./ui/context-menu";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuGroup,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 interface PlaceItem {
 	label: string;
 	icon: React.ReactNode;
 	path: string;
-}
-
-interface SidebarSection {
-	title: string;
-	items: PlaceItem[];
-	collapsible?: boolean;
 }
 
 function SidebarItem({
@@ -51,42 +68,40 @@ function SidebarItem({
 	onClick: () => void;
 	onRemove?: () => void;
 }) {
-	const [hovered, setHovered] = useState(false);
+	const { setCurrentPath } = useFileSystemStore();
+	const handlePointerDown = (e: React.PointerEvent) => {
+		if (e.button === 2) {
+			// Right click also navigates/selects in sidebar usually
+			onClick();
+		}
+	};
 
 	return (
-		<div
-			className={cn(
-				"group flex items-center gap-2.5 px-3 py-1.5 rounded-md text-sm cursor-default select-none transition-all duration-100",
-				isActive
-					? "bg-sidebar-primary/15 text-sidebar-primary font-semibold"
-					: "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-			)}
-			onClick={onClick}
-			onMouseEnter={() => setHovered(true)}
-			onMouseLeave={() => setHovered(false)}
-		>
-			<span
-				className={cn(
-					"shrink-0 transition-colors",
-					isActive ? "text-sidebar-primary" : "text-muted-foreground"
+		<ContextMenu>
+			<ContextMenuTrigger
+				render={
+					<Button
+						variant={isActive ? "default" : "ghost"}
+						className={cn("w-full", { "text-muted-foreground": !isActive })}
+						onClick={onClick}
+						onPointerDown={handlePointerDown}
+					>
+						{item.icon}
+						<span className="text-left truncate flex-1">{item.label}</span>
+					</Button>
+				}
+			></ContextMenuTrigger>
+			<ContextMenuContent>
+				{onRemove && (
+					<ContextMenuGroup>
+						<ContextMenuItem variant="destructive" onClick={onRemove}>
+							<Trash />
+							Remove
+						</ContextMenuItem>
+					</ContextMenuGroup>
 				)}
-			>
-				{item.icon}
-			</span>
-			<span className="truncate flex-1">{item.label}</span>
-			{onRemove && hovered && (
-				<button
-					className="shrink-0 opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity p-0.5 rounded"
-					onClick={(e) => {
-						e.stopPropagation();
-						onRemove();
-					}}
-					title="Remove from starred"
-				>
-					<X size={12} />
-				</button>
-			)}
-		</div>
+			</ContextMenuContent>
+		</ContextMenu>
 	);
 }
 
@@ -99,26 +114,31 @@ function CollapsibleSection({
 	children: React.ReactNode;
 	defaultOpen?: boolean;
 }) {
-	const [open, setOpen] = useState(defaultOpen);
-
 	return (
-		<div className="mb-1">
-			<button
-				className="w-full flex items-center gap-1 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-				onClick={() => setOpen((v) => !v)}
-			>
-				{open ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+		<Collapsible defaultOpen={defaultOpen} className="mb-1 px-1">
+			<CollapsibleTrigger className="group w-full flex items-center gap-1 py-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+				<ChevronDown
+					size={10}
+					className="transition-transform duration-200 ease-out -rotate-90 group-data-panel-open:rotate-0"
+				/>
 				{title}
-			</button>
-			{open && <div className="space-y-0.5">{children}</div>}
-		</div>
+			</CollapsibleTrigger>
+			<CollapsibleContent>{children}</CollapsibleContent>
+		</Collapsible>
 	);
 }
 
 export function Sidebar() {
-	const { currentPath, setCurrentPath } = useFileSystemStore();
-	const { starred, removeStarred } = useSidebarStore();
+	const { starred, removeStarred, isSidebarOpen } = useSidebarStore();
 	const [places, setPlaces] = useState<PlaceItem[]>([]);
+	const {
+		currentPath,
+		setCurrentPath,
+		goBack,
+		goForward,
+		historyIndex,
+		history,
+	} = useFileSystemStore();
 
 	useEffect(() => {
 		async function loadPaths() {
@@ -196,15 +216,65 @@ export function Sidebar() {
 		},
 	];
 
+	if (!isSidebarOpen) return null;
+
 	return (
 		<aside className="w-52 shrink-0 flex flex-col bg-sidebar border-r border-sidebar-border overflow-y-auto py-2 gap-1">
-			{/* Places */}
+			<div className="flex items-center justify-between px-1">
+				<div className="flex items-center gap-0.5">
+					<DropdownMenu>
+						<DropdownMenuTrigger
+							render={
+								<Button variant="ghost" size="icon" className="size-7">
+									<Ellipsis size={15} />
+								</Button>
+							}
+						/>
+						<DropdownMenuContent side="bottom" align="start">
+							<DropdownMenuGroup>
+								<DropdownMenuLabel>My Account</DropdownMenuLabel>
+								<DropdownMenuItem>Profile</DropdownMenuItem>
+								<DropdownMenuItem>Billing</DropdownMenuItem>
+							</DropdownMenuGroup>
+							<DropdownMenuSeparator />
+							<DropdownMenuGroup>
+								<DropdownMenuItem>Team</DropdownMenuItem>
+								<DropdownMenuItem>Subscription</DropdownMenuItem>
+							</DropdownMenuGroup>
+						</DropdownMenuContent>
+					</DropdownMenu>
+				</div>
+				<div className="flex items-center gap-0.5">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={goBack}
+						disabled={historyIndex <= 0}
+						className="size-7"
+					>
+						<ChevronLeft size={15} />
+					</Button>
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={goForward}
+						disabled={historyIndex >= history.length - 1}
+						className="size-7"
+					>
+						<ChevronRight size={15} />
+					</Button>
+				</div>
+			</div>
+
 			<CollapsibleSection title="Places">
 				{places.map((item) => (
 					<SidebarItem
 						key={item.path}
 						item={item}
-						isActive={currentPath === item.path || currentPath === item.path.replace(/\/$/, "")}
+						isActive={
+							currentPath === item.path ||
+							currentPath === item.path.replace(/\/$/, "")
+						}
 						onClick={() => setCurrentPath(item.path)}
 					/>
 				))}

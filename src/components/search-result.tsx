@@ -1,6 +1,5 @@
-import { FileEntry } from "@/types/fs";
 import { FileIcon, FolderIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import type { FileEntry } from "@/types/fs";
 
 interface SearchResultsProps {
 	results: FileEntry[];
@@ -28,7 +27,7 @@ function formatSize(bytes: number): string {
 	if (bytes === 0) return "—";
 	const units = ["B", "KB", "MB", "GB"];
 	const i = Math.floor(Math.log(bytes) / Math.log(1024));
-	return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+	return `${(bytes / 1024 ** i).toFixed(1)} ${units[i]}`;
 }
 
 function getParentPath(path: string): string {
@@ -59,15 +58,13 @@ export function SearchResults({
 	return (
 		<div className="p-2 flex flex-col gap-0.5">
 			<p className="text-[11px] text-muted-foreground px-2 py-1">
-				{results.length >= 500 ? "500+ results" : `${results.length} results`} for "
-				{query}"
+				{results.length >= 500 ? "500+ results" : `${results.length} results`}{" "}
+				for "{query}"
 			</p>
 			{results.map((entry) => (
 				<div
 					key={entry.path}
-					onDoubleClick={() => {
-						if (entry.is_dir) onEntryDoubleClick(entry);
-					}}
+					onDoubleClick={() => onEntryDoubleClick(entry)}
 					className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent cursor-default transition-colors group select-none"
 				>
 					{entry.is_dir ? (
@@ -95,7 +92,8 @@ export function SearchResults({
 			))}
 			{results.length >= 500 && (
 				<p className="text-[11px] text-muted-foreground/50 text-center py-2 italic">
-					Showing first 500 results. Refine your search for more specific results.
+					Showing first 500 results. Refine your search for more specific
+					results.
 				</p>
 			)}
 		</div>

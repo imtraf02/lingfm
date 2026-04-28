@@ -1,3 +1,4 @@
+import { FileIcon, FolderIcon, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
 	Dialog,
@@ -6,8 +7,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { tauriInvoke } from "@/lib/tauri";
-import { FileEntry } from "@/types/fs";
-import { FolderIcon, FileIcon, Loader2 } from "lucide-react";
+import type { FileEntry } from "@/types/fs";
 
 interface EntryProperties {
 	name: string;
@@ -31,7 +31,7 @@ function formatBytes(bytes: number): string {
 	if (bytes === 0) return "0 B";
 	const units = ["B", "KB", "MB", "GB", "TB"];
 	const i = Math.floor(Math.log(bytes) / Math.log(1024));
-	return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]} (${bytes.toLocaleString()} bytes)`;
+	return `${(bytes / 1024 ** i).toFixed(2)} ${units[i]} (${bytes.toLocaleString()} bytes)`;
 }
 
 function formatDate(ts: number): string {
@@ -50,7 +50,11 @@ function Row({ label, value }: { label: string; value: string }) {
 	);
 }
 
-export function PropertiesDialog({ entry, open, onClose }: PropertiesDialogProps) {
+export function PropertiesDialog({
+	entry,
+	open,
+	onClose,
+}: PropertiesDialogProps) {
 	const [props, setProps] = useState<EntryProperties | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -76,11 +80,14 @@ export function PropertiesDialog({ entry, open, onClose }: PropertiesDialogProps
 
 	return (
 		<Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-			<DialogContent className="max-w-md">
+			<DialogContent className="sm:max-w-lg">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-3">
 						{entry?.is_dir ? (
-							<FolderIcon size={22} className="text-blue-500 fill-blue-500/20 shrink-0" />
+							<FolderIcon
+								size={22}
+								className="text-blue-500 fill-blue-500/20 shrink-0"
+							/>
 						) : (
 							<FileIcon size={22} className="text-muted-foreground shrink-0" />
 						)}
@@ -96,16 +103,23 @@ export function PropertiesDialog({ entry, open, onClose }: PropertiesDialogProps
 						</div>
 					)}
 
-					{error && (
-						<p className="text-sm text-destructive py-4">{error}</p>
-					)}
+					{error && <p className="text-sm text-destructive py-4">{error}</p>}
 
 					{props && !loading && (
 						<div className="space-y-4 divide-y divide-border">
 							{/* General */}
 							<div className="space-y-3 pb-4">
 								<Row label="Name" value={props.name} />
-								<Row label="Type" value={props.is_dir ? "Folder" : (entry?.extension ? `.${entry.extension} File` : "File")} />
+								<Row
+									label="Type"
+									value={
+										props.is_dir
+											? "Folder"
+											: entry?.extension
+												? `.${entry.extension} File`
+												: "File"
+									}
+								/>
 								<Row label="Location" value={props.path} />
 							</div>
 
@@ -113,7 +127,10 @@ export function PropertiesDialog({ entry, open, onClose }: PropertiesDialogProps
 							<div className="space-y-3 py-4">
 								{props.is_dir ? (
 									<>
-										<Row label="Contents" value={`${props.item_count ?? 0} items`} />
+										<Row
+											label="Contents"
+											value={`${props.item_count ?? 0} items`}
+										/>
 										<Row label="Size" value={formatBytes(props.size_on_disk)} />
 									</>
 								) : (

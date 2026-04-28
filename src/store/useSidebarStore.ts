@@ -8,15 +8,18 @@ export interface StarredItem {
 
 interface SidebarState {
 	starred: StarredItem[];
+	isSidebarOpen: boolean;
 	addStarred: (item: StarredItem) => void;
 	removeStarred: (path: string) => void;
 	isStarred: (path: string) => boolean;
+	toggleSidebar: () => void;
 }
 
 export const useSidebarStore = create<SidebarState>()(
 	persist(
 		(set, get) => ({
 			starred: [],
+			isSidebarOpen: true,
 
 			addStarred: (item) => {
 				const { starred } = get();
@@ -30,6 +33,8 @@ export const useSidebarStore = create<SidebarState>()(
 			},
 
 			isStarred: (path) => get().starred.some((s) => s.path === path),
+
+			toggleSidebar: () => set({ isSidebarOpen: !get().isSidebarOpen }),
 		}),
 		{ name: "lingfm-sidebar" }
 	)
