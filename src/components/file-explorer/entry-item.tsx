@@ -11,9 +11,11 @@ import {
 	Trash2,
 	Link2,
 	Unlink,
+	RotateCcw,
+	Pencil,
+	ListRestart,
 } from "lucide-react";
-import type React from "react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { toast } from "sonner";
 import {
 	ContextMenu,
@@ -26,38 +28,34 @@ import {
 import { cn } from "@/lib/utils";
 import { useFileSystemStore } from "@/store/use-file-system-store";
 import { useSidebarStore } from "@/store/use-sidebar-store";
-import type { FileEntry } from "@/types/fs";
+import type { RichFileEntry as FileEntry } from "@/types/fs";
 import { FileSvgIcon, FolderSvgIcon, ImageThumb } from "./file-icon";
 import { getExt, getFileType } from "./utils";
 
 interface EntryItemProps {
 	entry: FileEntry;
 	isSelected: boolean;
-	onSingleClick: (e: React.MouseEvent) => void;
-	onDoubleClick: () => void;
-	onOpenProperties: () => void;
-	onRequestDelete: () => void;
+	isMultiSelected: boolean;
+	onSingleClick: (e: React.MouseEvent, entry: FileEntry) => void;
+	onDoubleClick: (entry: FileEntry) => void;
+	onOpenProperties: (entry: FileEntry) => void;
+	onRequestDelete: (entry: FileEntry) => void;
+	onRequestRename: (entry: FileEntry) => void;
 }
 
-export function EntryItem({
+export const EntryItem = memo(function EntryItem({
 	entry,
 	isSelected,
+	isMultiSelected,
 	onSingleClick,
 	onDoubleClick,
 	onOpenProperties,
 	onRequestDelete,
+	onRequestRename,
 }: EntryItemProps) {
-	const { addStarred, removeStarred, isStarred } = useSidebarStore();
-	const {
-		setClipboard,
-		refresh,
-		pasteClipboard,
-		clipboard,
-		selectEntry,
-		moveEntry,
-		selectedPaths,
-	} = useFileSystemStore();
-	const starred = isStarred(entry.path);
+	const starred = useSidebarStore((s) => s.starred.some((item) => item.path === entry.path));
+	const isInTrash = useFileSystemStore((s) => s.currentPath.includes(".local/share/Trash"));
+	const hasClipboard = useFileSystemStore((s) => !!s.clipboard);
 	const [isOver, setIsOver] = useState(false);
 
 	const type = getFileType(entry);
@@ -65,11 +63,12 @@ export function EntryItem({
 	const isImage = type === "image";
 
 	const handleStar = () => {
+		const state = useSidebarStore.getState();
 		if (starred) {
-			removeStarred(entry.path);
+			state.removeStarred(entry.path);
 			toast.success(`Removed from starred`);
 		} else {
-			addStarred({ name: entry.name, path: entry.path });
+			state.addStarred({ name: entry.name, path: entry.path });
 			toast.success(`Starred ${entry.name}`);
 		}
 	};
@@ -80,13 +79,13 @@ export function EntryItem({
 
 		if (e.detail === 2) {
 			// Double click detected
-			onDoubleClick();
+			onDoubleClick(entry);
 			if (!entry.is_dir) {
 				toast.info(`Opening file: ${entry.name}`);
 			}
 		} else if (e.detail === 1) {
 			// Single click
-			onSingleClick(e);
+			onSingleClick(e, entry);
 		}
 	};
 
@@ -94,7 +93,7 @@ export function EntryItem({
 		if (e.button === 2) {
 			// Right click — ensure the item is selected before context menu appears
 			if (!isSelected) {
-				selectEntry(entry.path, false);
+				useFileSystemStore.getState().selectEntry(entry.path, false);
 			}
 		}
 	};
@@ -106,6 +105,7 @@ export function EntryItem({
 	//    that would miss the GDK pointer state needed to initiate a native X11 drag.
 	const handleDragStart = (e: React.DragEvent) => {
 		e.preventDefault();
+		const selectedPaths = useFileSystemStore.getState().selectedPaths;
 		const paths = selectedPaths.has(entry.path) ? Array.from(selectedPaths) : [entry.path];
 		startDrag({ item: paths, icon: "" }).catch((err) =>
 			console.error("[lingfm] startDrag failed:", err),
@@ -134,7 +134,7 @@ export function EntryItem({
 			const name = srcPath.split(/[\\/]/).pop() || "";
 			const destPath = `${entry.path.replace(/[\\/]$/, "")}/${name}`;
 			try {
-				await moveEntry(srcPath, destPath);
+				await useFileSystemStore.getState().moveEntry(srcPath, destPath);
 				toast.success(`Moved ${name}`);
 			} catch (err) {
 				toast.error(`Failed to move: ${err}`);
@@ -164,7 +164,7 @@ export function EntryItem({
 								? "bg-accent border-[var(--ring)]"
 								: "border-transparent hover:bg-accent hover:border-[var(--border)]",
 							isOver &&
-								"bg-accent/80 ring-2 ring-primary border-primary/50 scale-[1.02]",
+							"bg-accent/80 ring-2 ring-primary border-primary/50 scale-[1.02]",
 							entry.is_hidden && "opacity-60 hover:opacity-100"
 						)}
 					>
@@ -243,7 +243,7 @@ export function EntryItem({
 				{entry.is_dir && (
 					<>
 						<ContextMenuItem
-							onClick={onDoubleClick}
+							onClick={() => onDoubleClick(entry)}
 							className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
 						>
 							<FolderOpen size={13} className="text-muted-foreground" />
@@ -253,77 +253,134 @@ export function EntryItem({
 					</>
 				)}
 
-				<ContextMenuItem
-					onClick={handleStar}
-					className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
-				>
-					<Star
-						size={13}
-						className={cn(
-							starred ? "fill-chart-4 text-chart-4" : "text-muted-foreground",
+				{!isInTrash && (
+					<>
+						<ContextMenuItem
+							onClick={handleStar}
+							className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
+						>
+							<Star
+								size={13}
+								className={cn(
+									starred ? "fill-chart-4 text-chart-4" : "text-muted-foreground",
+								)}
+							/>
+							{starred ? "Remove from Starred" : "Add to Starred"}
+						</ContextMenuItem>
+
+						<ContextMenuSeparator className="bg-border my-1" />
+					</>
+				)}
+
+				{isInTrash && (
+					<>
+						<ContextMenuItem
+							onClick={async () => {
+								try {
+									await useFileSystemStore.getState().restoreEntry(entry.path);
+									toast.success(`Restored ${entry.name}`);
+								} catch (err) {
+									toast.error(`Failed to restore ${entry.name}: ${err}`);
+								}
+							}}
+							className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
+						>
+							<RotateCcw size={13} className="text-muted-foreground" />
+							Restore
+						</ContextMenuItem>
+						<ContextMenuSeparator className="bg-border my-1" />
+					</>
+				)}
+
+				{!isInTrash && (
+					<>
+						<ContextMenuItem
+							onClick={async () => {
+								const selectedPaths = useFileSystemStore.getState().selectedPaths;
+								const paths = selectedPaths.has(entry.path) ? Array.from(selectedPaths) : [entry.path];
+								const name = paths.length > 1 ? `${paths.length} items` : entry.name;
+								useFileSystemStore.getState().setClipboard({ paths, name, op: "copy" });
+								try {
+									await invoke("copy_files_to_system_clipboard", { paths });
+								} catch (err) {
+									console.warn("[lingfm] system clipboard copy failed:", err);
+									// Fallback: at least put the path as plain text
+									navigator.clipboard.writeText(paths.join('\n')).catch(() => { });
+								}
+								toast.success(`Copied ${name}`);
+							}}
+							className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
+						>
+							<Copy size={13} className="text-muted-foreground" />
+							Copy
+							<ContextMenuShortcut className="text-muted-foreground text-[10px]">
+								⌘C
+							</ContextMenuShortcut>
+						</ContextMenuItem>
+
+						<ContextMenuItem
+							onClick={async () => {
+								const selectedPaths = useFileSystemStore.getState().selectedPaths;
+								const paths = selectedPaths.has(entry.path) ? Array.from(selectedPaths) : [entry.path];
+								const name = paths.length > 1 ? `${paths.length} items` : entry.name;
+								useFileSystemStore.getState().setClipboard({ paths, name, op: "cut" });
+								try {
+									await invoke("copy_files_to_system_clipboard", { paths });
+								} catch (err) {
+									console.warn("[lingfm] system clipboard cut failed:", err);
+									navigator.clipboard.writeText(paths.join('\n')).catch(() => { });
+								}
+								toast.success(`Cut ${name}`);
+							}}
+							className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
+						>
+							<Scissors size={13} className="text-muted-foreground" />
+							Cut
+							<ContextMenuShortcut className="text-muted-foreground text-[10px]">
+								⌘X
+							</ContextMenuShortcut>
+						</ContextMenuItem>
+
+						{hasClipboard && (
+							<ContextMenuItem
+								onClick={() => useFileSystemStore.getState().pasteClipboard()}
+								className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
+							>
+								<ClipboardPaste size={13} className="text-muted-foreground" />
+								Paste
+								<ContextMenuShortcut className="text-muted-foreground text-[10px]">
+									⌘V
+								</ContextMenuShortcut>
+							</ContextMenuItem>
 						)}
-					/>
-					{starred ? "Remove from Starred" : "Add to Starred"}
-				</ContextMenuItem>
 
-				<ContextMenuSeparator className="bg-border my-1" />
+						<ContextMenuItem
+							onClick={() => onRequestRename(entry)}
+							onPointerDown={(e) => e.stopPropagation()}
+							className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
+						>
+							<Pencil size={13} className="text-muted-foreground" />
+							Rename
+							<ContextMenuShortcut className="text-muted-foreground text-[10px]">
+								F2
+							</ContextMenuShortcut>
+						</ContextMenuItem>
 
-				<ContextMenuItem
-					onClick={async () => {
-						const paths = selectedPaths.has(entry.path) ? Array.from(selectedPaths) : [entry.path];
-						const name = paths.length > 1 ? `${paths.length} items` : entry.name;
-						setClipboard({ paths, name, op: "copy" });
-						try {
-							await invoke("copy_files_to_system_clipboard", { paths });
-						} catch (err) {
-							console.warn("[lingfm] system clipboard copy failed:", err);
-							// Fallback: at least put the path as plain text
-							navigator.clipboard.writeText(paths.join('\n')).catch(() => {});
-						}
-						toast.success(`Copied ${name}`);
-					}}
-					className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
-				>
-					<Copy size={13} className="text-muted-foreground" />
-					Copy
-					<ContextMenuShortcut className="text-muted-foreground text-[10px]">
-						⌘C
-					</ContextMenuShortcut>
-				</ContextMenuItem>
-
-				<ContextMenuItem
-					onClick={async () => {
-						const paths = selectedPaths.has(entry.path) ? Array.from(selectedPaths) : [entry.path];
-						const name = paths.length > 1 ? `${paths.length} items` : entry.name;
-						setClipboard({ paths, name, op: "cut" });
-						try {
-							await invoke("copy_files_to_system_clipboard", { paths });
-						} catch (err) {
-							console.warn("[lingfm] system clipboard cut failed:", err);
-							navigator.clipboard.writeText(paths.join('\n')).catch(() => {});
-						}
-						toast.success(`Cut ${name}`);
-					}}
-					className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
-				>
-					<Scissors size={13} className="text-muted-foreground" />
-					Cut
-					<ContextMenuShortcut className="text-muted-foreground text-[10px]">
-						⌘X
-					</ContextMenuShortcut>
-				</ContextMenuItem>
-
-				{clipboard && (
-					<ContextMenuItem
-						onClick={pasteClipboard}
-						className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
-					>
-						<ClipboardPaste size={13} className="text-muted-foreground" />
-						Paste
-						<ContextMenuShortcut className="text-muted-foreground text-[10px]">
-							⌘V
-						</ContextMenuShortcut>
-					</ContextMenuItem>
+						{isMultiSelected && (
+							<ContextMenuItem
+								onClick={() => {
+									const state = useFileSystemStore.getState();
+									const targets = state.entries.filter((e) => state.selectedPaths.has(e.path));
+									if (targets.length > 0) state.setBulkRenamingEntries(targets);
+								}}
+								onPointerDown={(e) => e.stopPropagation()}
+								className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
+							>
+								<ListRestart size={13} className="text-muted-foreground" />
+								Bulk Rename
+							</ContextMenuItem>
+						)}
+					</>
 				)}
 
 				<ContextMenuItem
@@ -339,7 +396,7 @@ export function EntryItem({
 				<ContextMenuSeparator className="bg-border my-1" />
 
 				<ContextMenuItem
-					onClick={refresh}
+					onClick={() => useFileSystemStore.getState().refresh()}
 					className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
 				>
 					<RefreshCw size={13} className="text-muted-foreground" />
@@ -347,7 +404,7 @@ export function EntryItem({
 				</ContextMenuItem>
 
 				<ContextMenuItem
-					onClick={onOpenProperties}
+					onClick={() => onOpenProperties(entry)}
 					className="gap-2 text-xs text-foreground hover:bg-accent hover:text-accent-foreground rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
 				>
 					<Info size={13} className="text-muted-foreground" />
@@ -358,16 +415,16 @@ export function EntryItem({
 
 				<ContextMenuItem
 					variant="destructive"
-					onClick={onRequestDelete}
+					onClick={() => onRequestDelete(entry)}
 					className="gap-2 text-xs focus:bg-[color-mix(in_oklch,var(--destructive)_10%,transparent)] hover:bg-[color-mix(in_oklch,var(--destructive)_10%,transparent)] rounded-[calc(var(--radius)*0.75)] px-2 py-1.5 cursor-default"
 				>
 					<Trash2 size={13} />
-					Delete
+					{isInTrash ? "Delete Permanently" : "Delete"}
 					<ContextMenuShortcut className="opacity-40 text-[10px]">
-						⌫
+						{isInTrash ? "⇧⌫" : "⌫"}
 					</ContextMenuShortcut>
 				</ContextMenuItem>
 			</ContextMenuContent>
 		</ContextMenu>
 	);
-}
+});

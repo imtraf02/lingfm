@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tauriInvoke } from "@/lib/tauri";
-import type { FileEntry } from "@/types/fs";
+import type { RichFileEntry as FileEntry } from "@/types/fs";
 
-type SearchMode = "filter" | "deep";
+type SearchMode = "filter" | "deep" | "global";
 
 interface UseSearchResult {
 	query: string;
@@ -18,6 +18,7 @@ interface UseSearchResult {
 export function useSearch(
 	currentPath: string,
 	localEntries: FileEntry[],
+	homePath: string,
 ): UseSearchResult {
 	const [query, setQueryRaw] = useState("");
 	const [mode, setMode] = useState<SearchMode>("filter");
@@ -29,7 +30,7 @@ export function useSearch(
 
 	const isActive = query.trim().length > 0;
 
-	// Deep search via Rust backend (debounced)
+	// Deep/Global search via Rust backend (debounced)
 	const runDeepSearch = useCallback(async (q: string, root: string) => {
 		if (!q.trim()) return;
 		abortRef.current = false;
@@ -86,10 +87,11 @@ export function useSearch(
 			return;
 		}
 
-		if (mode === "deep") {
+		if (mode === "deep" || mode === "global") {
 			setIsSearching(true);
 			debounceRef.current = setTimeout(() => {
-				runDeepSearch(query, currentPath);
+				const searchRoot = mode === "global" ? homePath : currentPath;
+				runDeepSearch(query, searchRoot);
 			}, 400);
 		} else {
 			setIsSearching(false);
@@ -101,15 +103,17 @@ export function useSearch(
 		return () => {
 			if (debounceRef.current) clearTimeout(debounceRef.current);
 		};
-	}, [query, mode, currentPath, localEntries, runDeepSearch, runFilterSearch]);
+	}, [query, mode, currentPath, localEntries, homePath, runDeepSearch, runFilterSearch]);
 
-	// Reset deep results when path changes
+	// Reset deep results when path changes (except in global mode)
 	useEffect(() => {
-		abortRef.current = true;
-		setDeepResults([]);
-		setFilterResults([]);
-		setIsSearching(false);
-	}, [currentPath]);
+		if (mode !== "global") {
+			abortRef.current = true;
+			setDeepResults([]);
+			setFilterResults([]);
+			setIsSearching(false);
+		}
+	}, [currentPath, mode]);
 
 	const setQuery = (q: string) => {
 		setQueryRaw(q);

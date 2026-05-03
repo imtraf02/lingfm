@@ -9,28 +9,28 @@ import {
 	videoDir,
 } from "@tauri-apps/api/path";
 import {
-	Bookmark,
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
-	Download,
 	Ellipsis,
-	FileText,
-	Home,
 	Image,
 	Monitor,
 	Music,
 	Network,
-	Search,
-	Trash,
-	Trash2,
 	Video,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { HomeIcon } from "@/components/animated-icons/home";
+import { DownloadIcon } from "@/components/animated-icons/download";
+import { SearchIcon } from "@/components/animated-icons/search";
+import { DeleteIcon } from "@/components/animated-icons/delete";
+import { FileTextIcon } from "@/components/animated-icons/file-text";
+import { BookmarkIcon } from "@/components/animated-icons/bookmark";
+import { cloneElement, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useFileSystemStore } from "@/store/use-file-system-store";
 import { useSidebarStore } from "@/store/use-sidebar-store";
+import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import {
 	Collapsible,
@@ -40,7 +40,6 @@ import {
 import {
 	ContextMenu,
 	ContextMenuContent,
-	ContextMenuGroup,
 	ContextMenuItem,
 	ContextMenuTrigger,
 } from "./ui/context-menu";
@@ -73,6 +72,16 @@ function SidebarItem({
 }) {
 	const { moveEntry } = useFileSystemStore();
 	const [isOver, setIsOver] = useState(false);
+	const iconRef = useRef<any>(null);
+
+	const handleMouseEnter = () => {
+		iconRef.current?.startAnimation();
+	};
+
+	const handleMouseLeave = () => {
+		iconRef.current?.stopAnimation();
+		setIsOver(false);
+	};
 
 	const handleDragStart = (e: React.DragEvent) => {
 		e.preventDefault();
@@ -85,9 +94,7 @@ function SidebarItem({
 		setIsOver(true);
 	};
 
-	const handleDragLeave = () => {
-		setIsOver(false);
-	};
+
 
 	const handleDrop = async (e: React.DragEvent) => {
 		e.preventDefault();
@@ -121,22 +128,27 @@ function SidebarItem({
 						draggable
 						onDragStart={handleDragStart}
 						onDragOver={handleDragOver}
-						onDragLeave={handleDragLeave}
+						onDragLeave={handleMouseLeave}
+						onMouseEnter={handleMouseEnter}
+						onMouseLeave={handleMouseLeave}
 						onDrop={handleDrop}
 					>
-						{item.icon}
+						{cloneElement(item.icon as React.ReactElement<{ ref?: any }>, { ref: iconRef })}
 						<span className="text-left truncate flex-1">{item.label}</span>
 					</Button>
 				}
 			></ContextMenuTrigger>
 			<ContextMenuContent>
 				{onRemove && (
-					<ContextMenuGroup>
-						<ContextMenuItem variant="destructive" onClick={onRemove}>
-							<Trash />
-							Remove
-						</ContextMenuItem>
-					</ContextMenuGroup>
+					<ContextMenuItem
+						variant="destructive"
+						onClick={onRemove}
+						onMouseEnter={() => iconRef.current?.startAnimation()}
+						onMouseLeave={() => iconRef.current?.stopAnimation()}
+					>
+						<DeleteIcon size={15} ref={iconRef} />
+						Remove
+					</ContextMenuItem>
 				)}
 			</ContextMenuContent>
 		</ContextMenu>
@@ -166,7 +178,11 @@ function CollapsibleSection({
 	);
 }
 
-export function Sidebar() {
+interface SidebarProps {
+	onSearch?: () => void;
+}
+
+export function Sidebar({ onSearch }: SidebarProps) {
 	const { starred, removeStarred, isSidebarOpen } = useSidebarStore();
 	const [places, setPlaces] = useState<PlaceItem[]>([]);
 	const {
@@ -199,7 +215,7 @@ export function Sidebar() {
 			setPlaces([
 				{
 					label: "Home",
-					icon: <Home size={15} />,
+					icon: <HomeIcon size={15} />,
 					path: home,
 				},
 				{
@@ -209,12 +225,12 @@ export function Sidebar() {
 				},
 				{
 					label: "Downloads",
-					icon: <Download size={15} />,
+					icon: <DownloadIcon size={15} />,
 					path: downloads,
 				},
 				{
 					label: "Documents",
-					icon: <FileText size={15} />,
+					icon: <FileTextIcon size={15} />,
 					path: documents,
 				},
 				{
@@ -249,7 +265,7 @@ export function Sidebar() {
 	const trashItems: PlaceItem[] = [
 		{
 			label: "Trash",
-			icon: <Trash2 size={15} />,
+			icon: <DeleteIcon size={15} />,
 			path: `${(places[0]?.path ?? "/home").replace(/\/$/, "")}/.local/share/Trash/files`,
 		},
 	];
@@ -281,8 +297,8 @@ export function Sidebar() {
 							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<Button variant="ghost" className="size-7" size="icon">
-						<Search />
+					<Button variant="ghost" className="size-7" size="icon" onClick={onSearch}>
+						<SearchIcon size={15} />
 					</Button>
 				</div>
 				<div className="flex items-center gap-0.5">
@@ -307,66 +323,69 @@ export function Sidebar() {
 				</div>
 			</div>
 
-			<CollapsibleSection title="Places">
-				{places.map((item) => (
-					<SidebarItem
-						key={item.path}
-						item={item}
-						isActive={
-							currentPath === item.path ||
-							currentPath === item.path.replace(/\/$/, "")
-						}
-						onClick={() => setCurrentPath(item.path)}
-					/>
-				))}
-			</CollapsibleSection>
+			<ScrollArea className="flex-1">
+				<div className="px-1 space-y-1">
+					<CollapsibleSection title="Places">
+						{places.map((item) => (
+							<SidebarItem
+								key={item.path}
+								item={item}
+								isActive={
+									currentPath === item.path ||
+									currentPath === item.path.replace(/\/$/, "")
+								}
+								onClick={() => setCurrentPath(item.path)}
+							/>
+						))}
+					</CollapsibleSection>
 
-			{/* Starred */}
-			<CollapsibleSection title="Starred">
-				{starred.length === 0 ? (
-					<p className="px-4 py-2 text-[11px] text-muted-foreground/50 italic">
-						No starred folders
-					</p>
-				) : (
-					starred.map((item) => (
-						<SidebarItem
-							key={item.path}
-							item={{
-								label: item.name,
-								icon: <Bookmark size={15} />,
-								path: item.path,
-							}}
-							isActive={currentPath === item.path}
-							onClick={() => setCurrentPath(item.path)}
-							onRemove={() => removeStarred(item.path)}
-						/>
-					))
-				)}
-			</CollapsibleSection>
+					{/* Starred */}
+					<CollapsibleSection title="Starred">
+						{starred.length === 0 ? (
+							<p className="px-4 py-2 text-[11px] text-muted-foreground/50 italic">
+								No starred folders
+							</p>
+						) : (
+							starred.map((item) => (
+								<SidebarItem
+									key={item.path}
+									item={{
+										label: item.name,
+										icon: <BookmarkIcon size={15} />,
+										path: item.path,
+									}}
+									isActive={currentPath === item.path}
+									onClick={() => setCurrentPath(item.path)}
+									onRemove={() => removeStarred(item.path)}
+								/>
+							))
+						)}
+					</CollapsibleSection>
 
-			{/* Network */}
-			<CollapsibleSection title="Network" defaultOpen={false}>
-				{networkItems.map((item) => (
-					<SidebarItem
-						key={item.path}
-						item={item}
-						isActive={currentPath === item.path}
-						onClick={() => setCurrentPath(item.path)}
-					/>
-				))}
-			</CollapsibleSection>
+					{/* Network */}
+					<CollapsibleSection title="Network" defaultOpen={false}>
+						{networkItems.map((item) => (
+							<SidebarItem
+								key={item.path}
+								item={item}
+								isActive={currentPath === item.path}
+								onClick={() => setCurrentPath(item.path)}
+							/>
+						))}
+					</CollapsibleSection>
 
-			{/* Trash */}
-			<div className="mt-auto pt-2 border-t border-sidebar-border mx-2">
-				{trashItems.map((item) => (
-					<SidebarItem
-						key={item.path}
-						item={item}
-						isActive={currentPath === item.path}
-						onClick={() => setCurrentPath(item.path)}
-					/>
-				))}
-			</div>
+					<div className="mt-auto pt-2 border-t border-sidebar-border mx-2">
+						{trashItems.map((item) => (
+							<SidebarItem
+								key={item.path}
+								item={item}
+								isActive={currentPath === item.path}
+								onClick={() => setCurrentPath(item.path)}
+							/>
+						))}
+					</div>
+				</div>
+			</ScrollArea>
 		</aside>
 	);
 }

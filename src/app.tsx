@@ -3,7 +3,8 @@ import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { ArrowUpDown, Minus, Search, Square, Star, X } from "lucide-react";
+import { ArrowUpDown, Minus, Square, Star, X } from "lucide-react";
+import { SearchIcon } from "@/components/animated-icons/search";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { FileExplorer } from "@/components/file-explorer/file-explorer";
@@ -17,6 +18,7 @@ import { useSearch } from "@/hooks/use-search";
 import { cn } from "@/lib/utils";
 import { useFileSystemStore } from "@/store/use-file-system-store";
 import { useSidebarStore } from "@/store/use-sidebar-store";
+import { ScrollArea } from "./components/ui/scroll-area";
 import { Kbd } from "./components/ui/kbd";
 import {
 	Tooltip,
@@ -34,24 +36,21 @@ import {
 const appWindow = getCurrentWindow();
 
 function App() {
-	const {
-		currentPath,
-		entries,
-		isLoading,
-		error,
-		setCurrentPath,
-		goBack,
-		goForward,
-		refresh,
-		selectedPaths,
-		selectEntry,
-		setHomePath,
-		moveEntry,
-		initWatcher,
-		activeTasks,
-		sortOptions,
-		setSortOptions,
-	} = useFileSystemStore();
+	const currentPath = useFileSystemStore((s) => s.currentPath);
+	const entries = useFileSystemStore((s) => s.entries);
+	const isLoading = useFileSystemStore((s) => s.isLoading);
+	const error = useFileSystemStore((s) => s.error);
+	const setCurrentPath = useFileSystemStore((s) => s.setCurrentPath);
+	const goBack = useFileSystemStore((s) => s.goBack);
+	const goForward = useFileSystemStore((s) => s.goForward);
+	const refresh = useFileSystemStore((s) => s.refresh);
+	const selectedPaths = useFileSystemStore((s) => s.selectedPaths);
+	const selectEntry = useFileSystemStore((s) => s.selectEntry);
+	const setHomePath = useFileSystemStore((s) => s.setHomePath);
+	const initWatcher = useFileSystemStore((s) => s.initWatcher);
+	const activeTasks = useFileSystemStore((s) => s.activeTasks);
+	const sortOptions = useFileSystemStore((s) => s.sortOptions);
+	const setSortOptions = useFileSystemStore((s) => s.setSortOptions);
 
 	const { addStarred, removeStarred, isStarred, toggleSidebar } =
 		useSidebarStore();
@@ -59,6 +58,7 @@ function App() {
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [editPathOpen, setEditPathOpen] = useState(false);
 	const searchBtnRef = useRef<HTMLButtonElement>(null);
+	const searchIconRef = useRef<any>(null);
 
 	const {
 		query,
@@ -69,7 +69,7 @@ function App() {
 		setMode,
 		results,
 		clear,
-	} = useSearch(currentPath, entries);
+	} = useSearch(currentPath, entries, useFileSystemStore.getState().homePath);
 
 	const currentName =
 		currentPath.split("/").filter(Boolean).pop() ?? currentPath;
@@ -85,9 +85,10 @@ function App() {
 		}
 	};
 
-	const openSearch = () => {
+	const openSearch = (initialMode: "filter" | "deep" | "global" = "filter") => {
 		setEditPathOpen(false);
 		setSearchOpen(true);
+		setMode(initialMode);
 	};
 	const closeSearch = () => {
 		clear();
@@ -117,7 +118,7 @@ function App() {
 				if (searchOpen) {
 					closeSearch();
 				} else {
-					openSearch();
+					openSearch("filter");
 				}
 			},
 		},
@@ -176,8 +177,7 @@ function App() {
 			if (e.key.length === 1 && e.key !== " ") {
 				if (!searchOpen && !editPathOpen) {
 					e.preventDefault();
-					openSearch();
-					setMode("filter");
+					openSearch("filter");
 					setQuery(e.key);
 				}
 			}
@@ -284,7 +284,8 @@ function App() {
 			}
 		}
 		init();
-	}, [setCurrentPath, setHomePath]);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const showDeepResults = isActive && mode === "deep";
 	const showFilterResults = isActive && mode === "filter";
@@ -292,7 +293,7 @@ function App() {
 	return (
 		<div className="flex flex-col h-screen bg-background text-foreground overflow-hidden font-sans border shadow-2xl select-none">
 			<div className="flex flex-1 overflow-hidden">
-				<Sidebar />
+				<Sidebar onSearch={() => openSearch("global")} />
 
 				<div className="flex flex-col w-full">
 					<header className="flex items-center gap-2 px-2 bg-background border-b border-border h-11 shrink-0">
@@ -346,14 +347,16 @@ function App() {
 										ref={searchBtnRef}
 										variant="ghost"
 										size="icon"
-										onClick={searchOpen ? closeSearch : openSearch}
+										onClick={searchOpen ? closeSearch : () => openSearch("filter")}
+										onMouseEnter={() => searchIconRef.current?.startAnimation()}
+										onMouseLeave={() => searchIconRef.current?.stopAnimation()}
 										className={cn(
 											"size-7 shrink-0 transition-colors",
 											searchOpen &&
 											"text-primary hover:text-primary hover:bg-primary/10",
 										)}
 									>
-										<Search size={15} />
+										<SearchIcon size={15} ref={searchIconRef} />
 									</Button>
 								}
 							></TooltipTrigger>
@@ -479,69 +482,44 @@ function App() {
 					</header>
 
 					<main className="flex-1 overflow-hidden bg-background">
-						{error && (
-							<div className="m-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm flex flex-col gap-2">
-								<div className="font-bold flex items-center gap-2">
-									<X size={16} />
-									Error Accessing Directory
-								</div>
-								<p className="opacity-90">{error}</p>
-								<div className="flex gap-2 mt-2">
-									<Button
-										variant="outline"
-										size="sm"
-										className="w-fit"
-										onClick={() => setCurrentPath("/")}
-									>
-										Go to Root (/)
-									</Button>
-									<Button
-										variant="outline"
-										size="sm"
-										className="w-fit"
-										onClick={() => {
-											navigator.clipboard.writeText(error);
-											toast.success("Copied error to clipboard");
-										}}
-									>
-										Copy Error
-									</Button>
-								</div>
-							</div>
-						)}
-
-						{/* Deep search: list view */}
-						{!error && showDeepResults && (
-							<SearchResults
-								results={results}
-								query={query}
-								mode={mode}
-								onEntryDoubleClick={async (entry) => {
-									if (entry.is_dir) {
-										setCurrentPath(entry.path);
-									} else {
-										try {
-											await openPath(entry.path);
-										} catch (_err) {
-											toast.error("Failed to open file");
-										}
-									}
-									closeSearch();
-								}}
-							/>
-						)}
-
-						{!showDeepResults && (
-							<>
-								{showFilterResults && results.length === 0 && !isLoading && (
-									<div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-1">
-										<p className="text-sm">No results for "{query}"</p>
-										<p className="text-xs opacity-60">in current folder</p>
+						<ScrollArea className="h-full">
+							{error && (
+								<div className="m-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm flex flex-col gap-2">
+									<div className="font-bold flex items-center gap-2">
+										<X size={16} />
+										Error Accessing Directory
 									</div>
-								)}
+									<p className="opacity-90">{error}</p>
+									<div className="flex gap-2 mt-2">
+										<Button
+											variant="outline"
+											size="sm"
+											className="w-fit"
+											onClick={() => setCurrentPath("/")}
+										>
+											Go to Root (/)
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											className="w-fit"
+											onClick={() => {
+												navigator.clipboard.writeText(error);
+												toast.success("Copied error to clipboard");
+											}}
+										>
+											Copy Error
+										</Button>
+									</div>
+								</div>
+							)}
 
-								<FileExplorer
-									entries={results}
+							{/* Deep search: list view */}
+							{!error && showDeepResults && (
+								<SearchResults
+									results={results}
+									query={query}
+									mode={mode}
 									onEntryDoubleClick={async (entry) => {
 										if (entry.is_dir) {
 											setCurrentPath(entry.path);
@@ -552,10 +530,37 @@ function App() {
 												toast.error("Failed to open file");
 											}
 										}
+										closeSearch();
 									}}
 								/>
-							</>
-						)}
+							)}
+
+							{!showDeepResults && (
+								<>
+									{showFilterResults && results.length === 0 && !isLoading && (
+										<div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-1">
+											<p className="text-sm">No results for "{query}"</p>
+											<p className="text-xs opacity-60">in current folder</p>
+										</div>
+									)}
+
+									<FileExplorer
+										entries={results}
+										onEntryDoubleClick={async (entry) => {
+											if (entry.is_dir) {
+												setCurrentPath(entry.path);
+											} else {
+												try {
+													await openPath(entry.path);
+												} catch (_err) {
+													toast.error("Failed to open file");
+												}
+											}
+										}}
+									/>
+								</>
+							)}
+						</ScrollArea>
 					</main>
 				</div>
 			</div>
@@ -599,8 +604,8 @@ function App() {
 									className="h-full bg-primary transition-all duration-300 ease-out"
 									style={{
 										width: `${task.total > 0
-												? Math.max(5, (task.done / task.total) * 100)
-												: 100
+											? Math.max(5, (task.done / task.total) * 100)
+											: 100
 											}%`,
 									}}
 								/>

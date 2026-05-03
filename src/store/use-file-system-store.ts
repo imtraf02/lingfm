@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { tauriInvoke } from "@/lib/tauri";
 import type {
   FsEvent,
@@ -58,6 +59,8 @@ interface FileSystemState {
   selectEntry: (path: string, multi: boolean) => void;
   selectAll: () => void;
   clearSelection: () => void;
+  bulkRenamingEntries: RichFileEntry[];
+  setBulkRenamingEntries: (entries: RichFileEntry[]) => void;
 
   // Clipboard
   clipboard: ClipboardEntry | null;
@@ -65,6 +68,7 @@ interface FileSystemState {
 
   // Tasks (async scheduler)
   activeTasks: Map<number, ActiveTask>;
+  lastTrashedPaths: string[][];
 
   // Sort / filter
   setSortOptions: (opts: Partial<SortOptions>) => Promise<void>;
@@ -83,6 +87,10 @@ interface FileSystemState {
   moveEntry: (src: string, dest: string) => Promise<void>;
   pasteClipboard: (onProgress?: (done: number, total: number) => void) => Promise<void>;
   createDirectory: (name: string) => Promise<void>;
+  trashEntries: (paths: string[]) => Promise<void>;
+  restoreEntry: (path: string) => Promise<void>;
+  undoTrash: () => Promise<void>;
+  renameEntry: (from: string, newName: string) => Promise<void>;
   setHomePath: (path: string) => void;
 
   // Watcher setup (called once on app mount)
@@ -100,7 +108,9 @@ async function loadDir(
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useFileSystemStore = create<FileSystemState>((set, get) => ({
+export const useFileSystemStore = create<FileSystemState>()(
+  persist(
+    (set, get) => ({
   currentPath: "",
   entries: [],
   isLoading: false,
@@ -111,6 +121,8 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
   selectedPaths: new Set(),
   clipboard: null,
   activeTasks: new Map(),
+  lastTrashedPaths: [],
+  bulkRenamingEntries: [],
   sortOptions: { ...DEFAULT_SORT },
 
   setHomePath: (path) => set({ homePath: path }),
@@ -139,6 +151,7 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
   },
 
   clearSelection: () => set({ selectedPaths: new Set() }),
+  setBulkRenamingEntries: (entries) => set({ bulkRenamingEntries: entries }),
 
   setClipboard: (clipboard) => set({ clipboard }),
 
@@ -228,9 +241,7 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
   deleteEntries: async (paths: string[]) => {
     set({ isLoading: true, error: null });
     try {
-      for (const p of paths) {
-        await tauriInvoke("delete_entry", { path: p });
-      }
+      await Promise.all(paths.map(p => tauriInvoke("delete_entry", { path: p })));
       const { currentPath, sortOptions } = get();
       const entries = await loadDir(currentPath, sortOptions);
       set({ entries, isLoading: false, selectedPaths: new Set() });
@@ -241,11 +252,12 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
   softDeleteEntries: async (paths: string[], onProgress?: (done: number, total: number) => void) => {
     set({ isLoading: true, error: null });
-    const softDeleted = [];
-    const total = paths.length;
+    const softDeleted: { src: string; dest: string }[] = [];
     let done = 0;
+    const total = paths.length;
+
     try {
-      for (const p of paths) {
+      await Promise.all(paths.map(async (p) => {
         const parts = p.split(/[\\/]/);
         const filename = parts.pop();
         const dir = parts.join("/");
@@ -254,7 +266,8 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
         softDeleted.push({ src: p, dest });
         done++;
         if (onProgress) onProgress(done, total);
-      }
+      }));
+
       const { currentPath, sortOptions } = get();
       const entries = await loadDir(currentPath, sortOptions);
       set({ entries, isLoading: false, selectedPaths: new Set() });
@@ -267,14 +280,16 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
   undoSoftDelete: async (items: {src: string, dest: string}[], onProgress?: (done: number, total: number) => void) => {
     set({ isLoading: true, error: null });
-    const total = items.length;
     let done = 0;
+    const total = items.length;
+
     try {
-      for (const item of items) {
+      await Promise.all(items.map(async (item) => {
         await tauriInvoke("move_entry", { src: item.dest, dest: item.src });
         done++;
         if (onProgress) onProgress(done, total);
-      }
+      }));
+
       const { currentPath, sortOptions } = get();
       const entries = await loadDir(currentPath, sortOptions);
       set({ entries, isLoading: false });
@@ -285,9 +300,7 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
   commitDelete: async (items: {src: string, dest: string}[]) => {
     try {
-      for (const item of items) {
-        await tauriInvoke("delete_entry", { path: item.dest });
-      }
+      await Promise.all(items.map(item => tauriInvoke("delete_entry", { path: item.dest })));
     } catch (err) {
       console.error("Failed to commit delete:", err);
     }
@@ -316,20 +329,18 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
 
     set({ isLoading: true, error: null });
     try {
-      for (const srcPath of clipboard.paths) {
+      // 1. Calculate all destination paths synchronously to avoid collisions
+      const operations = clipboard.paths.map((srcPath) => {
         const originalName = srcPath.split(/[\\/]/).pop() || clipboard.name;
         let destName = originalName;
         let destPath = `${currentPath.replace(/\/$/, "")}/${destName}`;
 
         if (clipboard.op === "cut" && destPath === srcPath) {
-          done++;
-          if (onProgress) onProgress(done, total);
-          continue; // Cutting and pasting in the same directory does nothing
+          return { srcPath, destPath, skip: true };
         }
 
         let counter = 1;
         const extMatch = originalName.lastIndexOf(".");
-        // Ignore extension if it's the first character (hidden file without extension)
         const hasExt = extMatch > 0;
         const base = hasExt ? originalName.slice(0, extMatch) : originalName;
         const ext = hasExt ? originalName.slice(extMatch) : "";
@@ -341,13 +352,24 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
         }
 
         existingNames.add(destName);
-        await tauriInvoke("copy_entry", { src: srcPath, dest: destPath });
+        return { srcPath, destPath, skip: false };
+      });
+
+      // 2. Execute operations in parallel
+      await Promise.all(operations.map(async (op) => {
+        if (op.skip) {
+          done++;
+          if (onProgress) onProgress(done, total);
+          return;
+        }
+
+        await tauriInvoke("copy_entry", { src: op.srcPath, dest: op.destPath });
         if (clipboard.op === "cut") {
-          await tauriInvoke("delete_entry", { path: srcPath });
+          await tauriInvoke("delete_entry", { path: op.srcPath });
         }
         done++;
         if (onProgress) onProgress(done, total);
-      }
+      }));
       
       if (clipboard.op === "cut") {
         set({ clipboard: null });
@@ -371,6 +393,63 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
       set({ entries, isLoading: false });
     } catch (err) {
       set({ error: extractError(err), isLoading: false });
+    }
+  },
+
+  trashEntries: async (paths: string[]) => {
+    set({ isLoading: true, error: null });
+    try {
+      await Promise.all(paths.map(p => tauriInvoke("async_trash", { path: p })));
+      set((state) => ({ 
+        lastTrashedPaths: [paths, ...state.lastTrashedPaths.slice(0, 9)],
+        isLoading: false, 
+        selectedPaths: new Set(),
+        bulkRenamingEntries: [],
+      }));
+    } catch (err) {
+      set({ error: extractError(err), isLoading: false });
+    }
+  },
+
+  restoreEntry: async (path: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await tauriInvoke("restore_entry", { path });
+      set({ isLoading: false });
+    } catch (err) {
+      set({ error: extractError(err), isLoading: false });
+      throw err;
+    }
+  },
+
+  undoTrash: async () => {
+    const { lastTrashedPaths } = get();
+    if (lastTrashedPaths.length === 0) return;
+
+    const paths = lastTrashedPaths[0];
+    set({ isLoading: true, error: null });
+    try {
+      for (const p of paths) {
+        await tauriInvoke("undo_trash", { originalPath: p });
+      }
+      set((state) => ({ 
+        lastTrashedPaths: state.lastTrashedPaths.slice(1),
+        isLoading: false 
+      }));
+    } catch (err) {
+      set({ error: extractError(err), isLoading: false });
+      throw err;
+    }
+  },
+
+  renameEntry: async (from: string, newName: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      await tauriInvoke("async_rename", { path: from, newName });
+      set({ isLoading: false });
+    } catch (err) {
+      set({ error: extractError(err), isLoading: false });
+      throw err;
     }
   },
 
@@ -421,4 +500,9 @@ export const useFileSystemStore = create<FileSystemState>((set, get) => ({
       unlistenDone();
     };
   },
+}), {
+  name: "lingfm-fs-state",
+  partialize: (state) => ({
+    sortOptions: state.sortOptions,
+  }),
 }));

@@ -1,14 +1,13 @@
 mod commands;
-mod cha;
-mod natsort;
-mod scheduler;
+mod shared;
+mod core;
+mod fs;
 mod watcher;
 
 use tauri::Manager;
-use scheduler::FmScheduler;
+use core::tasks::scheduler::FmScheduler;
 use tokio::sync::Mutex;
-use watcher::FmWatcher;
-
+use watcher::watcher::FmWatcher;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,27 +29,30 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // ── Legacy (backward-compat) ──────────────────────────────────────
-            commands::fs_ops::read_directory,
-            commands::fs_ops::get_entry_properties,
-            commands::fs_ops::delete_entry,
-            commands::fs_ops::move_entry,
-            commands::fs_ops::copy_entry,
-            commands::fs_ops::create_directory,
-            commands::fs_ops::search_entries,
-            commands::fs_ops::copy_files_to_system_clipboard,
-            commands::fs_ops::fzf_filter,
-            // ── Rich FS (Yazi-inspired) ───────────────────────────────────────
-            commands::fs_ops::read_dir_rich,
-            // ── Async task scheduler ─────────────────────────────────────────
-            commands::fs_ops::async_copy,
-            commands::fs_ops::async_move,
-            commands::fs_ops::async_delete,
-            commands::fs_ops::async_trash,
-            commands::fs_ops::async_rename,
-            // ── File watcher ─────────────────────────────────────────────────
-            commands::fs_ops::watch_dir,
-            commands::fs_ops::unwatch_dir,
+            // ── Read ─────────────────────────────────────────────────────────
+            commands::read::read_dir_rich,
+            commands::read::read_directory,
+            commands::read::get_entry_properties,
+            // ── Write ────────────────────────────────────────────────────────
+            commands::write::create_directory,
+            commands::write::delete_entry,
+            commands::write::move_entry,
+            commands::write::copy_entry,
+            commands::write::restore_entry,
+            commands::write::undo_trash,
+            // ── Search ───────────────────────────────────────────────────────
+            commands::search::search_entries,
+            commands::search::fzf_filter,
+            // ── Tasks ────────────────────────────────────────────────────────
+            commands::tasks::async_copy,
+            commands::tasks::async_move,
+            commands::tasks::async_delete,
+            commands::tasks::async_trash,
+            commands::tasks::async_rename,
+            // ── System ───────────────────────────────────────────────────────
+            commands::system::copy_files_to_system_clipboard,
+            commands::system::watch_dir,
+            commands::system::unwatch_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

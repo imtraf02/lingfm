@@ -7,7 +7,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { tauriInvoke } from "@/lib/tauri";
-import type { FileEntry } from "@/types/fs";
+import type { RichFileEntry as FileEntry } from "@/types/fs";
 
 interface EntryProperties {
 	name: string;

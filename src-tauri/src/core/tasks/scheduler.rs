@@ -6,6 +6,7 @@
 /// - Progress is emitted as Tauri events so the frontend can show real-time progress bars
 use std::{
     path::{Path, PathBuf},
+    process::Command,
     sync::atomic::{AtomicU32, Ordering as AOrdering},
 };
 
@@ -271,7 +272,25 @@ async fn run_delete(target: &Path, id: u32, app: &AppHandle) -> Result<(), Vec<S
         tokio::fs::remove_file(target).await
     };
 
-    result.map_err(|e| vec![format!("Cannot delete {}: {e}", target.display())])
+    if let Err(e) = result {
+        if e.kind() == std::io::ErrorKind::PermissionDenied {
+            // Fallback to pkexec rm -rf for privileged deletion
+            let status = Command::new("pkexec")
+                .arg("rm")
+                .arg("-rf")
+                .arg(target)
+                .status();
+            
+            match status {
+                Ok(s) if s.success() => return Ok(()),
+                Ok(_) => return Err(vec!["Authentication failed or cancelled".into()]),
+                Err(err) => return Err(vec![format!("Failed to launch pkexec: {err}")]),
+            }
+        }
+        return Err(vec![format!("Cannot delete {}: {e}", target.display())]);
+    }
+    
+    Ok(())
 }
 
 // ─── Trash ────────────────────────────────────────────────────────────────────
@@ -280,12 +299,30 @@ async fn run_trash(target: &Path, id: u32, app: &AppHandle) -> Result<(), Vec<St
     let name = target.file_name().unwrap_or_default().to_string_lossy().into_owned();
     emit_progress(app, id, "trash", &name, 0, 0, 1, 0, 0);
 
-    let target = target.to_path_buf();
-    tokio::task::spawn_blocking(move || {
-        trash::delete(&target).map_err(|e| vec![format!("Cannot trash {}: {e}", target.display())])
+    let target_buf = target.to_path_buf();
+    let result = tokio::task::spawn_blocking(move || {
+        trash::delete(&target_buf).map_err(|e| vec![format!("Cannot trash {}: {e}", target_buf.display())])
     })
     .await
-    .unwrap_or_else(|e| Err(vec![format!("Task panicked: {e}")]))
+    .unwrap_or_else(|e| Err(vec![format!("Task panicked: {e}")]));
+
+    if let Err(errs) = result {
+        // If trashing fails due to permission, offer to delete permanently as root
+        // Note: We can't easily trash as root to the user's trash.
+        // We'll try pkexec rm as a fallback for trashing privileged files too.
+        let status = Command::new("pkexec")
+            .arg("rm")
+            .arg("-rf")
+            .arg(target)
+            .status();
+
+        match status {
+            Ok(s) if s.success() => return Ok(()),
+            _ => return Err(errs), // Return original trash error if pkexec fails/cancelled
+        }
+    }
+
+    Ok(())
 }
 
 // ─── Rename ───────────────────────────────────────────────────────────────────

@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 interface SearchBarProps {
 	query: string;
 	onQueryChange: (q: string) => void;
-	mode: "filter" | "deep";
-	onModeChange: (m: "filter" | "deep") => void;
+	mode: "filter" | "deep" | "global";
+	onModeChange: (m: "filter" | "deep" | "global") => void;
 	isSearching: boolean;
 	onClear: () => void;
 	onClose: () => void;
@@ -56,6 +56,8 @@ export function SearchBar({
 					placeholder={
 						mode === "filter"
 							? `Search in ${currentFolder}…`
+							: mode === "global"
+							? "Global search in Home…"
 							: "Deep search Subdirectories…"
 					}
 					className="flex-1 bg-transparent text-[12px] font-mono outline-none placeholder:text-muted-foreground/40 min-w-0"
@@ -93,6 +95,21 @@ export function SearchBar({
 					)}
 				>
 					Deep
+				</button>
+				<button
+					type="button"
+					onClick={(e) => {
+						e.stopPropagation();
+						onModeChange("global");
+					}}
+					className={cn(
+						"text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tight transition-all border",
+						mode === "global"
+							? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+							: "text-muted-foreground/60 border-transparent hover:text-foreground",
+					)}
+				>
+					Global
 				</button>
 			</div>
 
