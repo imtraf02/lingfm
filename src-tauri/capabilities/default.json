@@ -12,6 +12,7 @@
     "core:window:allow-toggle-maximize",
     "opener:default",
     "opener:allow-open-path",
+    "drag:allow-start-drag",
     "fs:default",
     "fs:read-all",
     "fs:write-all",

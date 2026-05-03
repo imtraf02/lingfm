@@ -30,7 +30,14 @@ export function PathInput({
 	};
 
 	return (
-		<div className="flex-1 flex items-center gap-2 animate-in fade-in duration-150 h-full min-w-0">
+		<div 
+			className="flex-1 flex items-center gap-2 animate-in fade-in duration-150 h-full min-w-0"
+			onBlur={(e) => {
+				if (!e.currentTarget.contains(e.relatedTarget)) {
+					onClose();
+				}
+			}}
+		>
 			<div className="flex-1 flex items-center gap-2 h-full min-w-0">
 				<Folder size={13} className="text-primary shrink-0" />
 				<input

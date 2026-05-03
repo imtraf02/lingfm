@@ -439,39 +439,12 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     for entry in fs::read_dir(src).map_err(|e| e.to_string())? {
         let entry = entry.map_err(|e| e.to_string())?;
         let file_type = entry.file_type().map_err(|e| e.to_string())?;
-        let path = entry.path();
         let dest_child = dst.join(entry.file_name());
-
-        if file_type.is_symlink() {
-            // Preserve symlink on Unix, follow on others (or just copy as is if fs::copy supports it)
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::symlink;
-                if let Ok(target) = fs::read_link(&path) {
-                    if let Err(e) = symlink(target, &dest_child) {
-                        // If symlink creation fails, fallback to fs::copy (which follows it)
-                        // but only if it's not a directory
-                        if !path.is_dir() {
-                            fs::copy(&path, &dest_child).map(|_| ()).map_err(|e| e.to_string())?;
-                        } else {
-                            copy_dir_recursive(&path, &dest_child)?;
-                        }
-                    }
-                }
-            }
-            #[cfg(not(unix))]
-            {
-                if path.is_dir() {
-                    copy_dir_recursive(&path, &dest_child)?;
-                } else {
-                    fs::copy(&path, &dest_child).map(|_| ()).map_err(|e| e.to_string())?;
-                }
-            }
-        } else if file_type.is_dir() {
-            copy_dir_recursive(&path, &dest_child)?;
+        if file_type.is_dir() {
+            copy_dir_recursive(&entry.path(), &dest_child)?;
         } else {
-            fs::copy(&path, &dest_child)
-                .map_err(|e| format!("Cannot copy {:?}: {e}", path))?;
+            fs::copy(entry.path(), &dest_child)
+                .map_err(|e| format!("Cannot copy {:?}: {e}", entry.path()))?;
         }
     }
     Ok(())
@@ -485,67 +458,49 @@ pub async fn create_directory(path: String) -> Result<(), String> {
 
 #[command]
 pub async fn search_entries(root: String, query: String) -> Result<Vec<FileEntry>, String> {
-    use std::process::Command;
-    let output = Command::new("fzf")
-        .arg("-f")
-        .arg(&query)
-        .current_dir(&root)
-        .output()
-        .map_err(|e| format!("Failed to execute fzf: {e}"))?;
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let query_lower = query.to_lowercase();
+    let root_path = Path::new(&root);
     let mut results = Vec::new();
-    for line in stdout.lines().take(500) {
-        let entry_path = Path::new(&root).join(line);
-        let name = entry_path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-        if let Ok(metadata) = fs::metadata(&entry_path) {
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs())
-                .unwrap_or(0);
-            results.push(FileEntry {
-                name,
-                path: entry_path.to_string_lossy().into_owned(),
-                is_dir: metadata.is_dir(),
-                size: metadata.len(),
-                modified,
-                extension: entry_path.extension().map(|e| e.to_string_lossy().into_owned()),
-            });
-        }
-    }
+    search_recursive(root_path, &query_lower, &mut results, 0);
     Ok(results)
 }
 
-#[command]
-pub async fn fzf_filter(paths: Vec<String>, query: String) -> Result<Vec<String>, String> {
-    use std::process::{Command, Stdio};
-    use std::io::Write;
-    
-    if paths.is_empty() {
-        return Ok(Vec::new());
+fn search_recursive(dir: &Path, query: &str, results: &mut Vec<FileEntry>, depth: u32) {
+    if depth > 8 || results.len() >= 500 {
+        return;
     }
-
-    let mut child = Command::new("fzf")
-        .arg("-f")
-        .arg(&query)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn fzf: {e}"))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        for path in &paths {
-            let _ = writeln!(stdin, "{}", path);
+    let Ok(read) = fs::read_dir(dir) else { return };
+    for entry in read.flatten() {
+        if results.len() >= 500 {
+            break;
+        }
+        let entry_path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if depth == 0 && name.starts_with('.') {
+            continue;
+        }
+        if name.to_lowercase().contains(query) {
+            if let Ok(metadata) = fs::metadata(&entry_path) {
+                let modified = metadata
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs())
+                    .unwrap_or(0);
+                results.push(FileEntry {
+                    name: name.clone(),
+                    path: entry_path.to_string_lossy().into_owned(),
+                    is_dir: metadata.is_dir(),
+                    size: metadata.len(),
+                    modified,
+                    extension: entry_path.extension().map(|e| e.to_string_lossy().into_owned()),
+                });
+            }
+        }
+        if entry_path.is_dir() {
+            search_recursive(&entry_path, query, results, depth + 1);
         }
     }
-
-    let output = child.wait_with_output().map_err(|e| format!("Failed to wait on fzf: {e}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let result: Vec<String> = stdout.lines().map(|s| s.to_string()).collect();
-    
-    Ok(result)
 }
 
 #[command]

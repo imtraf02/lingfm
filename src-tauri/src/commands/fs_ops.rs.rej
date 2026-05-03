@@ -1,0 +1,79 @@
+--- fs_ops.rs
++++ fs_ops.rs
+@@ -460,46 +460,33 @@
+ 
+ #[command]
+ pub async fn search_entries(root: String, query: String) -> Result<Vec<FileEntry>, String> {
+-    let query_lower = query.to_lowercase();
+-    let root_path = Path::new(&root);
+-    let mut results = Vec::new();
+-    search_recursive(root_path, &query_lower, &mut results, 0);
+-    Ok(results)
+-}
+-
+-fn search_recursive(dir: &Path, query: &str, results: &mut Vec<FileEntry>, depth: u32) {
+-    if depth > 8 || results.len() >= 500 {
+-        return;
+-    }
+-    let Ok(read) = fs::read_dir(dir) else { return };
+-    for entry in read.flatten() {
+-        if results.len() >= 500 {
+-            break;
+-        }
+-        let entry_path = entry.path();
+-        let name = entry.file_name().to_string_lossy().into_owned();
+-        if depth == 0 && name.starts_with('.') {
+-            continue;
+-        }
+-        if name.to_lowercase().contains(query) {
+-            if let Ok(metadata) = fs::metadata(&entry_path) {
+-                let modified = metadata
+-                    .modified()
+-                    .ok()
+-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+-                    .map(|d| d.as_secs())
+-                    .unwrap_or(0);
+-                results.push(FileEntry {
+-                    name: name.clone(),
+-                    path: entry_path.to_string_lossy().into_owned(),
+-                    is_dir: metadata.is_dir(),
+-                    size: metadata.len(),
+-                    modified,
+-                    extension: entry_path.extension().map(|e| e.to_string_lossy().into_owned()),
+-                });
+-            }
+-        }
+-        if entry_path.is_dir() {
+-            search_recursive(&entry_path, query, results, depth + 1);
+-        }
+-    }
++    use std::process::Command;
++    let output = Command::new("fzf")
++        .arg("-f")
++        .arg(&query)
++        .current_dir(&root)
++        .output()
++        .map_err(|e| format!("Failed to execute fzf: {e}"))?;
++
++    let stdout = String::from_utf8_lossy(&output.stdout);
++    let mut results = Vec::new();
++    for line in stdout.lines().take(500) {
++        let entry_path = Path::new(&root).join(line);
++        let name = entry_path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
++        if let Ok(metadata) = fs::metadata(&entry_path) {
++            let modified = metadata
++                .modified()
++                .ok()
++                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
++                .map(|d| d.as_secs())
++                .unwrap_or(0);
++            results.push(FileEntry {
++                name,
++                path: entry_path.to_string_lossy().into_owned(),
++                is_dir: metadata.is_dir(),
++                size: metadata.len(),
++                modified,
++                extension: entry_path.extension().map(|e| e.to_string_lossy().into_owned()),
++            });
++        }
++    }

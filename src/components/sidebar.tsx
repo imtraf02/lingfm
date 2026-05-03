@@ -1,3 +1,4 @@
+import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import {
 	audioDir,
 	desktopDir,
@@ -20,14 +21,16 @@ import {
 	Monitor,
 	Music,
 	Network,
+	Search,
 	Trash,
 	Trash2,
 	Video,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { useFileSystemStore } from "@/store/useFileSystemStore";
-import { useSidebarStore } from "@/store/useSidebarStore";
+import { useFileSystemStore } from "@/store/use-file-system-store";
+import { useSidebarStore } from "@/store/use-sidebar-store";
 import { Button } from "./ui/button";
 import {
 	Collapsible,
@@ -68,11 +71,38 @@ function SidebarItem({
 	onClick: () => void;
 	onRemove?: () => void;
 }) {
-	const { setCurrentPath } = useFileSystemStore();
-	const handlePointerDown = (e: React.PointerEvent) => {
-		if (e.button === 2) {
-			// Right click also navigates/selects in sidebar usually
-			onClick();
+	const { moveEntry } = useFileSystemStore();
+	const [isOver, setIsOver] = useState(false);
+
+	const handleDragStart = (e: React.DragEvent) => {
+		e.preventDefault();
+		startDrag({ item: [item.path], icon: "" }).catch(console.error);
+	};
+
+	const handleDragOver = (e: React.DragEvent) => {
+		e.preventDefault();
+		e.dataTransfer.dropEffect = "move";
+		setIsOver(true);
+	};
+
+	const handleDragLeave = () => {
+		setIsOver(false);
+	};
+
+	const handleDrop = async (e: React.DragEvent) => {
+		e.preventDefault();
+		setIsOver(false);
+
+		const srcPath = e.dataTransfer.getData("application/lingfm-path");
+		if (srcPath && srcPath !== item.path) {
+			const name = srcPath.split(/[\\/]/).pop() || "";
+			const destPath = `${item.path.replace(/[\\/]$/, "")}/${name}`;
+			try {
+				await moveEntry(srcPath, destPath);
+				toast.success(`Moved ${name} to ${item.label}`);
+			} catch (err) {
+				toast.error(`Failed to move: ${err}`);
+			}
 		}
 	};
 
@@ -82,9 +112,17 @@ function SidebarItem({
 				render={
 					<Button
 						variant={isActive ? "default" : "ghost"}
-						className={cn("w-full", { "text-muted-foreground": !isActive })}
+						className={cn("w-full transition-all duration-150", {
+							"text-muted-foreground": !isActive,
+							"bg-accent/80 ring-2 ring-primary border-primary/50 scale-[1.02]":
+								isOver,
+						})}
 						onClick={onClick}
-						onPointerDown={handlePointerDown}
+						draggable
+						onDragStart={handleDragStart}
+						onDragOver={handleDragOver}
+						onDragLeave={handleDragLeave}
+						onDrop={handleDrop}
 					>
 						{item.icon}
 						<span className="text-left truncate flex-1">{item.label}</span>
@@ -219,8 +257,8 @@ export function Sidebar() {
 	if (!isSidebarOpen) return null;
 
 	return (
-		<aside className="w-52 shrink-0 flex flex-col bg-sidebar border-r border-sidebar-border overflow-y-auto py-2 gap-1">
-			<div className="flex items-center justify-between px-1">
+		<aside className="w-52 shrink-0 flex flex-col bg-sidebar border-r border-sidebar-border py-2 gap-1">
+			<div className="flex items-center justify-between">
 				<div className="flex items-center gap-0.5">
 					<DropdownMenu>
 						<DropdownMenuTrigger
@@ -232,7 +270,7 @@ export function Sidebar() {
 						/>
 						<DropdownMenuContent side="bottom" align="start">
 							<DropdownMenuGroup>
-								<DropdownMenuLabel>My Account</DropdownMenuLabel>
+								<DropdownMenuLabel>Settings</DropdownMenuLabel>
 								<DropdownMenuItem>Profile</DropdownMenuItem>
 								<DropdownMenuItem>Billing</DropdownMenuItem>
 							</DropdownMenuGroup>
@@ -243,6 +281,9 @@ export function Sidebar() {
 							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
+					<Button variant="ghost" className="size-7" size="icon">
+						<Search />
+					</Button>
 				</div>
 				<div className="flex items-center gap-0.5">
 					<Button

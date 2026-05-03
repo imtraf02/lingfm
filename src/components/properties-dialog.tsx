@@ -39,6 +39,21 @@ function formatDate(ts: number): string {
 	return new Date(ts * 1000).toLocaleString();
 }
 
+function formatMode(mode?: number): string {
+	if (mode === undefined) return "";
+	let out = "";
+	out += (mode & 0o400) ? "r" : "-";
+	out += (mode & 0o200) ? "w" : "-";
+	out += (mode & 0o100) ? "x" : "-";
+	out += (mode & 0o040) ? "r" : "-";
+	out += (mode & 0o020) ? "w" : "-";
+	out += (mode & 0o010) ? "x" : "-";
+	out += (mode & 0o004) ? "r" : "-";
+	out += (mode & 0o002) ? "w" : "-";
+	out += (mode & 0o001) ? "x" : "-";
+	return out;
+}
+
 function Row({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="flex flex-col gap-0.5">
@@ -113,14 +128,17 @@ export function PropertiesDialog({
 								<Row
 									label="Type"
 									value={
-										props.is_dir
-											? "Folder"
-											: entry?.extension
-												? `.${entry.extension} File`
-												: "File"
+										entry?.is_link
+											? "Symlink"
+											: props.is_dir
+												? "Folder"
+												: entry?.extension
+													? `.${entry.extension} File`
+													: "File"
 									}
 								/>
 								<Row label="Location" value={props.path} />
+								{entry?.link_to && <Row label="Target" value={entry.link_to} />}
 							</div>
 
 							{/* Size */}
@@ -148,7 +166,11 @@ export function PropertiesDialog({
 							<div className="space-y-3 pt-4">
 								<Row
 									label="Permissions"
-									value={props.is_readonly ? "Read only" : "Read & Write"}
+									value={
+										entry?.mode !== undefined
+											? `${props.is_readonly ? "Read only" : "Read & Write"} (${formatMode(entry.mode)})`
+											: props.is_readonly ? "Read only" : "Read & Write"
+									}
 								/>
 							</div>
 						</div>

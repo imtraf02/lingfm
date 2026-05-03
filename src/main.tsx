@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import App from "./App";
+import App from "./app";
 import "./index.css";
 import { Toaster } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
@@ -10,6 +10,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 		<TooltipProvider>
 			<App />
 		</TooltipProvider>
-		<Toaster />
+		<Toaster position="bottom-center" />
 	</React.StrictMode>,
 );
