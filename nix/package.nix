@@ -114,9 +114,15 @@ pkgs.rustPlatform.buildRustPackage {
     cp -r ${frontendDist}/* dist/
   '';
 
+  # Bắt buộc enable feature custom-protocol để Tauri embed frontend
+  # assets vào binary thay vì kết nối devUrl (localhost:1420)
+  cargoBuildFlags = [ "--features" "custom-protocol" ];
+
   env = {
     TAURI_SKIP_DEVSERVER_CHECK = "true";
     TAURI_CLI_NO_DEV_SERVER_WAIT = "1";
+    # Đảm bảo Tauri biết đây là production build
+    TAURI_ENV_DEBUG = "false";
   };
 
   postInstall = ''
