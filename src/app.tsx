@@ -3,9 +3,8 @@ import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { ArrowUpDown, Minus, Square, Star, X } from "lucide-react";
-import { SearchIcon } from "@/components/animated-icons/search";
-import { useEffect, useRef, useState } from "react";
+import { ArrowUpDown, Minus, Search, Square, Star, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { FileExplorer } from "@/components/file-explorer/file-explorer";
 import { PathBreadcrumbs } from "@/components/path-breadcrumbs";
@@ -18,13 +17,6 @@ import { useSearch } from "@/hooks/use-search";
 import { cn } from "@/lib/utils";
 import { useFileSystemStore } from "@/store/use-file-system-store";
 import { useSidebarStore } from "@/store/use-sidebar-store";
-import { ScrollArea } from "./components/ui/scroll-area";
-import { Kbd } from "./components/ui/kbd";
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipTrigger,
-} from "./components/ui/tooltip";
 import {
 	DropdownMenu,
 	DropdownMenuCheckboxItem,
@@ -32,6 +24,13 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "./components/ui/dropdown-menu";
+import { Kbd } from "./components/ui/kbd";
+import { ScrollArea } from "./components/ui/scroll-area";
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from "./components/ui/tooltip";
 
 const appWindow = getCurrentWindow();
 
@@ -57,8 +56,7 @@ function App() {
 
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [editPathOpen, setEditPathOpen] = useState(false);
-	const searchBtnRef = useRef<HTMLButtonElement>(null);
-	const searchIconRef = useRef<any>(null);
+	const [isWayland, setIsWayland] = useState(false);
 
 	const {
 		query,
@@ -236,7 +234,9 @@ function App() {
 							let counter = 1;
 							const extMatch = originalName.lastIndexOf(".");
 							const hasExt = extMatch > 0;
-							const base = hasExt ? originalName.slice(0, extMatch) : originalName;
+							const base = hasExt
+								? originalName.slice(0, extMatch)
+								: originalName;
 							const ext = hasExt ? originalName.slice(extMatch) : "";
 
 							while (existingNames.has(destName)) {
@@ -249,7 +249,10 @@ function App() {
 
 							try {
 								const { tauriInvoke } = await import("@/lib/tauri");
-								await tauriInvoke("copy_entry", { src: srcPath, dest: destPath });
+								await tauriInvoke("copy_entry", {
+									src: srcPath,
+									dest: destPath,
+								});
 								successCount++;
 							} catch (err) {
 								toast.error(`Failed to copy ${destName}: ${err}`);
@@ -276,6 +279,10 @@ function App() {
 	useEffect(() => {
 		async function init() {
 			try {
+				const { tauriInvoke } = await import("@/lib/tauri");
+				const result = await tauriInvoke<boolean>("is_wayland");
+				setIsWayland(result);
+
 				const home = await homeDir();
 				if (home) setHomePath(home);
 				await setCurrentPath(home ?? "/");
@@ -344,19 +351,18 @@ function App() {
 							<TooltipTrigger
 								render={
 									<Button
-										ref={searchBtnRef}
 										variant="ghost"
 										size="icon"
-										onClick={searchOpen ? closeSearch : () => openSearch("filter")}
-										onMouseEnter={() => searchIconRef.current?.startAnimation()}
-										onMouseLeave={() => searchIconRef.current?.stopAnimation()}
+										onClick={
+											searchOpen ? closeSearch : () => openSearch("filter")
+										}
 										className={cn(
 											"size-7 shrink-0 transition-colors",
 											searchOpen &&
-											"text-primary hover:text-primary hover:bg-primary/10",
+												"text-primary hover:text-primary hover:bg-primary/10",
 										)}
 									>
-										<SearchIcon size={15} ref={searchIconRef} />
+										<Search size={15} />
 									</Button>
 								}
 							></TooltipTrigger>
@@ -370,7 +376,10 @@ function App() {
 						{/* Sort Dropdown */}
 						<DropdownMenu>
 							<DropdownMenuTrigger className="inline-flex items-center justify-center rounded-lg hover:bg-accent hover:text-accent-foreground size-7 shrink-0 cursor-default outline-none transition-colors">
-								<ArrowUpDown size={15} className="text-muted-foreground hover:text-foreground" />
+								<ArrowUpDown
+									size={15}
+									className="text-muted-foreground hover:text-foreground"
+								/>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end" className="w-48">
 								<DropdownMenuCheckboxItem
@@ -414,26 +423,30 @@ function App() {
 
 								<DropdownMenuCheckboxItem
 									checked={sortOptions.reverse}
-									onCheckedChange={(c) => setSortOptions({ reverse: c === true })}
+									onCheckedChange={(c) =>
+										setSortOptions({ reverse: c === true })
+									}
 								>
 									Reverse Order
 								</DropdownMenuCheckboxItem>
 								<DropdownMenuCheckboxItem
 									checked={sortOptions.dir_first}
-									onCheckedChange={(c) => setSortOptions({ dir_first: c === true })}
+									onCheckedChange={(c) =>
+										setSortOptions({ dir_first: c === true })
+									}
 								>
 									Directories First
 								</DropdownMenuCheckboxItem>
 								<DropdownMenuCheckboxItem
 									checked={sortOptions.show_hidden}
-									onCheckedChange={(c) => setSortOptions({ show_hidden: c === true })}
+									onCheckedChange={(c) =>
+										setSortOptions({ show_hidden: c === true })
+									}
 								>
 									Show Hidden Files
 								</DropdownMenuCheckboxItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
-
-
 
 						{/* Star button */}
 						<Button
@@ -452,24 +465,30 @@ function App() {
 								)}
 							/>
 						</Button>
-						<Button
-							id="titlebar-minimize"
-							variant="ghost"
-							size="icon"
-							onClick={() => appWindow.minimize()}
-							className="size-7 shrink-0"
-						>
-							<Minus className="w-4 h-4" />
-						</Button>
-						<Button
-							id="titlebar-maximize"
-							variant="ghost"
-							size="icon"
-							onClick={() => appWindow.toggleMaximize()}
-							className="size-7 shrink-0"
-						>
-							<Square className="w-3 h-3" />
-						</Button>
+
+						{!isWayland && (
+							<>
+								<Button
+									id="titlebar-minimize"
+									variant="ghost"
+									size="icon"
+									onClick={() => appWindow.minimize()}
+									className="size-7 shrink-0"
+								>
+									<Minus className="w-4 h-4" />
+								</Button>
+								<Button
+									id="titlebar-maximize"
+									variant="ghost"
+									size="icon"
+									onClick={() => appWindow.toggleMaximize()}
+									className="size-7 shrink-0"
+								>
+									<Square className="w-3 h-3" />
+								</Button>
+							</>
+						)}
+
 						<Button
 							id="titlebar-close"
 							variant="ghost"
@@ -603,10 +622,11 @@ function App() {
 								<div
 									className="h-full bg-primary transition-all duration-300 ease-out"
 									style={{
-										width: `${task.total > 0
-											? Math.max(5, (task.done / task.total) * 100)
-											: 100
-											}%`,
+										width: `${
+											task.total > 0
+												? Math.max(5, (task.done / task.total) * 100)
+												: 100
+										}%`,
 									}}
 								/>
 							</div>

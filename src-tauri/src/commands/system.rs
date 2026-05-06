@@ -47,6 +47,14 @@ pub fn copy_files_to_system_clipboard(paths: Vec<String>) -> Result<(), String> 
 }
 
 #[command]
+pub fn is_wayland() -> bool {
+    std::env::var("XDG_SESSION_TYPE")
+        .map(|v| v == "wayland")
+        .unwrap_or(false)
+        || std::env::var("WAYLAND_DISPLAY").is_ok()
+}
+
+#[command]
 pub async fn watch_dir(
     path: String,
     watcher: State<'_, Mutex<FmWatcher>>,

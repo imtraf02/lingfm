@@ -19,7 +19,8 @@
 			"a11y": {
 				"useSemanticElements": "off",
 				"useKeyWithClickEvents": "off",
-				"noStaticElementInteractions": "off"
+				"noStaticElementInteractions": "off",
+				"noSvgWithoutTitle": "off"
 			}
 		}
 	},

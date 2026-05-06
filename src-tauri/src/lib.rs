@@ -51,6 +51,7 @@ pub fn run() {
             commands::tasks::async_rename,
             // ── System ───────────────────────────────────────────────────────
             commands::system::copy_files_to_system_clipboard,
+            commands::system::is_wayland,
             commands::system::watch_dir,
             commands::system::unwatch_dir,
         ])

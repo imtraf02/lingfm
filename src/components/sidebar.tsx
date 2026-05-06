@@ -9,28 +9,27 @@ import {
 	videoDir,
 } from "@tauri-apps/api/path";
 import {
+	Bookmark,
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
+	Download,
 	Ellipsis,
+	FileText,
+	Home,
 	Image,
 	Monitor,
 	Music,
 	Network,
+	Search,
+	Trash2,
 	Video,
 } from "lucide-react";
-import { HomeIcon } from "@/components/animated-icons/home";
-import { DownloadIcon } from "@/components/animated-icons/download";
-import { SearchIcon } from "@/components/animated-icons/search";
-import { DeleteIcon } from "@/components/animated-icons/delete";
-import { FileTextIcon } from "@/components/animated-icons/file-text";
-import { BookmarkIcon } from "@/components/animated-icons/bookmark";
-import { cloneElement, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useFileSystemStore } from "@/store/use-file-system-store";
 import { useSidebarStore } from "@/store/use-sidebar-store";
-import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import {
 	Collapsible,
@@ -52,6 +51,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface PlaceItem {
 	label: string;
@@ -72,14 +72,10 @@ function SidebarItem({
 }) {
 	const { moveEntry } = useFileSystemStore();
 	const [isOver, setIsOver] = useState(false);
-	const iconRef = useRef<any>(null);
 
-	const handleMouseEnter = () => {
-		iconRef.current?.startAnimation();
-	};
+	const handleMouseEnter = () => {};
 
 	const handleMouseLeave = () => {
-		iconRef.current?.stopAnimation();
 		setIsOver(false);
 	};
 
@@ -93,8 +89,6 @@ function SidebarItem({
 		e.dataTransfer.dropEffect = "move";
 		setIsOver(true);
 	};
-
-
 
 	const handleDrop = async (e: React.DragEvent) => {
 		e.preventDefault();
@@ -133,20 +127,15 @@ function SidebarItem({
 						onMouseLeave={handleMouseLeave}
 						onDrop={handleDrop}
 					>
-						{cloneElement(item.icon as React.ReactElement<{ ref?: any }>, { ref: iconRef })}
+						{item.icon}
 						<span className="text-left truncate flex-1">{item.label}</span>
 					</Button>
 				}
 			></ContextMenuTrigger>
 			<ContextMenuContent>
 				{onRemove && (
-					<ContextMenuItem
-						variant="destructive"
-						onClick={onRemove}
-						onMouseEnter={() => iconRef.current?.startAnimation()}
-						onMouseLeave={() => iconRef.current?.stopAnimation()}
-					>
-						<DeleteIcon size={15} ref={iconRef} />
+					<ContextMenuItem variant="destructive" onClick={onRemove}>
+						<Trash2 size={15} />
 						Remove
 					</ContextMenuItem>
 				)}
@@ -215,7 +204,7 @@ export function Sidebar({ onSearch }: SidebarProps) {
 			setPlaces([
 				{
 					label: "Home",
-					icon: <HomeIcon size={15} />,
+					icon: <Home size={15} />,
 					path: home,
 				},
 				{
@@ -225,12 +214,12 @@ export function Sidebar({ onSearch }: SidebarProps) {
 				},
 				{
 					label: "Downloads",
-					icon: <DownloadIcon size={15} />,
+					icon: <Download size={15} />,
 					path: downloads,
 				},
 				{
 					label: "Documents",
-					icon: <FileTextIcon size={15} />,
+					icon: <FileText size={15} />,
 					path: documents,
 				},
 				{
@@ -265,7 +254,7 @@ export function Sidebar({ onSearch }: SidebarProps) {
 	const trashItems: PlaceItem[] = [
 		{
 			label: "Trash",
-			icon: <DeleteIcon size={15} />,
+			icon: <Trash2 size={15} />,
 			path: `${(places[0]?.path ?? "/home").replace(/\/$/, "")}/.local/share/Trash/files`,
 		},
 	];
@@ -297,8 +286,13 @@ export function Sidebar({ onSearch }: SidebarProps) {
 							</DropdownMenuGroup>
 						</DropdownMenuContent>
 					</DropdownMenu>
-					<Button variant="ghost" className="size-7" size="icon" onClick={onSearch}>
-						<SearchIcon size={15} />
+					<Button
+						variant="ghost"
+						className="size-7"
+						size="icon"
+						onClick={onSearch}
+					>
+						<Search size={15} />
 					</Button>
 				</div>
 				<div className="flex items-center gap-0.5">
@@ -351,7 +345,7 @@ export function Sidebar({ onSearch }: SidebarProps) {
 									key={item.path}
 									item={{
 										label: item.name,
-										icon: <BookmarkIcon size={15} />,
+										icon: <Bookmark size={15} />,
 										path: item.path,
 									}}
 									isActive={currentPath === item.path}
