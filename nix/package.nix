@@ -40,6 +40,13 @@ rustPlatform.buildRustPackage rec {
     lockFile = ../src-tauri/Cargo.lock;
   };
 
+  # Enforce strict offline mode for pnpm and other tools
+  env = {
+    PNPM_CONFIG_OFFLINE = "true";
+    PNPM_CONFIG_UPDATE_NOTIFIER = "false";
+    CHECK_FOR_UPDATES = "false";
+  };
+
   nativeBuildInputs = [
     pkg-config
     nodejs
@@ -67,7 +74,7 @@ rustPlatform.buildRustPackage rec {
 
   preBuild = ''
     # Build frontend
-    pnpm build
+    pnpm build --offline
     cd src-tauri
   '';
 
