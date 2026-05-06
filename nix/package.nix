@@ -70,8 +70,8 @@ pkgs.rustPlatform.buildRustPackage {
     lockFile = "${src}/src-tauri/Cargo.lock";
   };
 
-  # Cargo workspace root nằm trong src-tauri/
-  cargoRoot = "src-tauri";
+  # Đặt sourceRoot vào src-tauri để cargo tìm thấy Cargo.toml và Cargo.lock
+  sourceRoot = "source/src-tauri";
 
   # -----------------------------------------------------------------------
   # Build inputs
@@ -105,9 +105,11 @@ pkgs.rustPlatform.buildRustPackage {
   # -----------------------------------------------------------------------
   # Pre-configure: đặt frontend dist vào đúng nơi mà Tauri expect
   # tauri.conf.json: "frontendDist": "../dist"
+  # Vì sourceRoot đang ở src-tauri, nên ta copy vào ../dist
   # -----------------------------------------------------------------------
   preConfigure = ''
-    cp -r ${frontendDist} dist
+    mkdir -p ../dist
+    cp -r ${frontendDist}/* ../dist/
   '';
 
   env = {
