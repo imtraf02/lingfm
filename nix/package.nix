@@ -41,9 +41,9 @@ rustPlatform.buildRustPackage rec {
   nativeBuildInputs = [
     pkg-config
     nodejs
-    pnpm.configHook
+    pnpm
+    pnpmConfigHook
     copyDesktopItems
-    rustPlatform.cargoSetupPostPatchHook
   ];
 
   buildInputs = [
