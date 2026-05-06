@@ -2,67 +2,76 @@
 
 A modern, fast, and feature-rich file manager built with Tauri v2, React 19, and Rust.
 
-## 🚀 Getting Started (NixOS / Nix Users)
+## 🚀 Quick Start (Nix / NixOS)
 
-This project uses **Nix Flakes** to manage its development environment and build process.
+This project is fully powered by **Nix Flakes**.
 
-### 1. Development Environment
-To start developing without installing any dependencies globally:
+### Development Shell
+To enter a shell with all dependencies (Rust, Node.js, pnpm, etc.) pre-installed:
 
 ```bash
 nix develop
-# Once inside the shell:
+# Then run:
 pnpm install
 pnpm tauri dev
 ```
 
-### 2. Build from Source
-To build the production binary using Nix:
+### Build from Source
+To build the production binary:
 
 ```bash
 nix build
-# The binary will be available at:
+# The binary will be located at:
 ./result/bin/lingfm
 ```
 
 ## ❄️ Installation on NixOS
 
-You can integrate LingFM into your NixOS configuration using the provided Flake modules.
+You can easily integrate LingFM into your NixOS or Home Manager configuration.
 
-### Add to your `flake.nix` inputs:
+### 1. Add to your `flake.nix` inputs
 
 ```nix
 {
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-    lingfm.url = "github:yourusername/lingfm"; # Replace with your actual repo
+    
+    lingfm = {
+      url = "github:imtraf02/lingfm";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, lingfm, ... }: {
-    nixosConfigurations.your-hostname = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        ./configuration.nix
-        lingfm.nixosModules.default # Add the module
-      ];
-    };
+  outputs = { self, nixpkgs, lingfm, ... }@inputs: {
+    # ... your NixOS configurations
   };
 }
 ```
 
-### Enable in `configuration.nix`:
+### 2. Use with Home Manager
+
+In your home-manager configuration file (e.g., `home.nix`):
 
 ```nix
-{
+{ inputs, ... }: {
+  imports = [
+    inputs.lingfm.homeModules.default
+  ];
+
   programs.lingfm.enable = true;
 }
 ```
 
-### Home Manager (Optional)
-If you prefer Home Manager, add `lingfm.homeManagerModules.default` to your modules and enable it:
+### 3. Use as a NixOS Module
+
+In your `configuration.nix`:
 
 ```nix
-{
+{ inputs, ... }: {
+  imports = [
+    inputs.lingfm.nixosModules.default
+  ];
+
   programs.lingfm.enable = true;
 }
 ```
