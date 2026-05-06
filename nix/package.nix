@@ -12,6 +12,7 @@
 , libsoup_3
 , nodejs
 , pnpm
+, fetchPnpmDeps
 , pnpmConfigHook
 , makeDesktopItem
 , copyDesktopItems
@@ -25,9 +26,9 @@ rustPlatform.buildRustPackage rec {
 
   # This is required for pnpmConfigHook to work
   # It fetches all node_modules dependencies and creates a fixed-output derivation
-  pnpmDeps = pnpm.fetchDeps {
-    inherit pname version src;
-    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # PLACEHOLDER: Nix will give you the real hash on first run
+  pnpmDeps = fetchPnpmDeps {
+    inherit pname src;
+    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   };
 
   sourceRoot = "source/src-tauri";
