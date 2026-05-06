@@ -61,7 +61,7 @@ rustPlatform.buildRustPackage rec {
   ];
 
   postPatch = ''
-    substituteInPlace tauri.conf.json \
+    substituteInPlace src-tauri/tauri.conf.json \
       --replace-fail '"beforeBuildCommand": "pnpm build"' '"beforeBuildCommand": ""'
   '';
 
