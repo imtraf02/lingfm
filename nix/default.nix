@@ -15,8 +15,8 @@ pkgs.mkShell {
     rustToolchain
 
     # ── Node / pnpm ───────────────────────────────────────────────────────
-    nodejs_22
-    pnpm_9
+    nodejs
+    pnpm
 
     # ── Tauri CLI ─────────────────────────────────────────────────────────
     cargo-tauri

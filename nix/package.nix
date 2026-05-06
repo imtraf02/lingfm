@@ -33,7 +33,7 @@ let
   nodeModules = pkgs.stdenv.mkDerivation {
     name = "${pname}-node-modules";
     inherit src;
-    nativeBuildInputs = [ pkgs.pnpm_9 pkgs.nodejs_22 ];
+    nativeBuildInputs = [ pkgs.pnpm pkgs.nodejs ];
 
     buildPhase = ''
       export HOME=$TMPDIR
@@ -56,7 +56,7 @@ let
   frontendDist = pkgs.stdenv.mkDerivation {
     name = "${pname}-frontend";
     inherit src;
-    nativeBuildInputs = [ pkgs.pnpm_9 pkgs.nodejs_22 ];
+    nativeBuildInputs = [ pkgs.pnpm pkgs.nodejs ];
 
     buildPhase = ''
       export HOME=$TMPDIR
