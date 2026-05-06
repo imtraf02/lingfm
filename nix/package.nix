@@ -41,6 +41,7 @@ rustPlatform.buildRustPackage rec {
   nativeBuildInputs = [
     pkg-config
     nodejs
+    pnpm
     pnpmConfigHook
     copyDesktopItems
   ];
