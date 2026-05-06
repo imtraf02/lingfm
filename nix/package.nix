@@ -104,12 +104,14 @@ pkgs.rustPlatform.buildRustPackage {
 
   # -----------------------------------------------------------------------
   # Pre-configure: đặt frontend dist vào đúng nơi mà Tauri expect
-  # tauri.conf.json: "frontendDist": "../dist"
-  # Vì sourceRoot đang ở src-tauri, nên ta copy vào ../dist
   # -----------------------------------------------------------------------
   preConfigure = ''
-    mkdir -p ../dist
-    cp -r ${frontendDist}/* ../dist/
+    # Sửa tauri.conf.json để tìm frontend ở ./dist thay vì ../dist
+    # Điều này tránh việc phải ghi đè vào thư mục cha (gây lỗi Permission Denied)
+    substituteInPlace tauri.conf.json --replace '"../dist"' '"./dist"'
+
+    mkdir -p dist
+    cp -r ${frontendDist}/* dist/
   '';
 
   env = {
