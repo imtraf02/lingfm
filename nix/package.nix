@@ -2,8 +2,6 @@
 {
   lib,
   pkgs,
-  stdenv,
-  rustPlatform,
   # self là flake self-reference (chỉ có khi gọi từ flake.nix).
   # Khi gọi từ NixOS/HM module, self = null và src fallback về cleanSource.
   self ? null,
@@ -12,56 +10,42 @@
 
 let
   # -----------------------------------------------------------------------
-  # Toolchain Rust
-  # -----------------------------------------------------------------------
-  rustToolchain = pkgs.rust-bin.stable.latest.default.override {
-    targets = [ "x86_64-unknown-linux-gnu" ];
-  };
-
-  # -----------------------------------------------------------------------
   # Metadata
   # -----------------------------------------------------------------------
   pname   = "lingfm";
   version = "0.1.0";
   # Nếu được gọi từ flake.nix thì dùng flake self (bao gồm cả flake.lock),
-  # nếu không (HM/NixOS module) thì dùng cleanSource để bỏ .git và các file không cần.
+  # nếu không (HM/NixOS module) thì dùng cleanSource để bỏ .git.
   src = if self != null then self else lib.cleanSource ./..;
 
   # -----------------------------------------------------------------------
-  # Frontend build (pnpm + vite)
+  # Frontend dependencies — dùng pnpm.fetchDeps (cách chính thức nixpkgs)
+  # Đây là fixed-output derivation, có network access + SSL certs đúng.
+  #
+  # Lần đầu build sẽ báo lỗi hash mismatch kiểu:
+  #   specified: sha256-AAAA...
+  #   got:       sha256-xxxx...
+  # Thay lib.fakeHash bằng hash thực tế đó.
   # -----------------------------------------------------------------------
-  nodeModules = pkgs.stdenv.mkDerivation {
-    name = "${pname}-node-modules";
-    inherit src;
-    nativeBuildInputs = [ pkgs.pnpm pkgs.nodejs ];
-
-    buildPhase = ''
-      export HOME=$TMPDIR
-      export npm_config_cache=$TMPDIR/.npm
-      pnpm config set store-dir $TMPDIR/.pnpm-store
-      pnpm install --frozen-lockfile
-    '';
-
-    installPhase = ''
-      mkdir -p $out
-      cp -r node_modules $out/node_modules
-    '';
-
-    outputHashAlgo = "sha256";
-    outputHashMode = "recursive";
-    # Cập nhật hash sau khi chạy `nix build` lần đầu với hash giả
-    outputHash     = lib.fakeSha256;
+  pnpmDeps = pkgs.pnpm.fetchDeps {
+    inherit pname version src;
+    hash = lib.fakeHash;
   };
 
+  # -----------------------------------------------------------------------
+  # Build frontend (React 19 + Vite)
+  # pnpm.configHook tự động setup offline store từ pnpmDeps
+  # -----------------------------------------------------------------------
   frontendDist = pkgs.stdenv.mkDerivation {
     name = "${pname}-frontend";
-    inherit src;
-    nativeBuildInputs = [ pkgs.pnpm pkgs.nodejs ];
+    inherit src pnpmDeps;
+
+    nativeBuildInputs = with pkgs; [
+      nodejs
+      pnpm.configHook
+    ];
 
     buildPhase = ''
-      export HOME=$TMPDIR
-      # Dùng lại node_modules từ derivation trên
-      ln -s ${nodeModules}/node_modules ./node_modules
       pnpm build
     '';
 
@@ -75,7 +59,7 @@ pkgs.rustPlatform.buildRustPackage {
   inherit pname version src;
 
   # -----------------------------------------------------------------------
-  # Cargo deps hash — cập nhật sau: nix build 2>&1 | grep "got:"
+  # Cargo deps — dùng cargoLock để Nix tự tính hash từ Cargo.lock
   # -----------------------------------------------------------------------
   cargoLock = {
     lockFile = "${src}/src-tauri/Cargo.lock";
@@ -115,16 +99,14 @@ pkgs.rustPlatform.buildRustPackage {
 
   # -----------------------------------------------------------------------
   # Pre-configure: đặt frontend dist vào đúng nơi mà Tauri expect
+  # tauri.conf.json: "frontendDist": "../dist"
   # -----------------------------------------------------------------------
   preConfigure = ''
-    # Tauri đọc frontendDist từ tauri.conf.json → ../dist
     cp -r ${frontendDist} dist
   '';
 
-  # Tauri bundle không cần thiết khi build bằng Nix
   env = {
     TAURI_SKIP_DEVSERVER_CHECK = "true";
-    # Tắt bundle (chúng ta tự install binary)
     TAURI_CLI_NO_DEV_SERVER_WAIT = "1";
   };
 
@@ -142,7 +124,7 @@ pkgs.rustPlatform.buildRustPackage {
     StartupWMClass=lingfm
     EOF
 
-    # Icon (nếu có)
+    # Icons
     if [ -f src-tauri/icons/128x128.png ]; then
       install -Dm644 src-tauri/icons/128x128.png \
         $out/share/icons/hicolor/128x128/apps/${pname}.png
