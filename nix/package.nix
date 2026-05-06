@@ -33,7 +33,7 @@ let
     inherit pname version src;
     # fetcherVersion = 2 dùng cho pnpm lockfile v9+ (pnpm >= v9)
     fetcherVersion = 2;
-    hash = lib.fakeHash;
+    hash = "sha256-ILPzv4tTwV3ztnzuZeNvlJYG9lKwL/P4XFjHM9Q+k6Y=";
   };
 
   # -----------------------------------------------------------------------
