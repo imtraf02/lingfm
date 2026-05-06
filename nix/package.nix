@@ -2,6 +2,8 @@
 {
   lib,
   pkgs,
+  fetchPnpmDeps,
+  pnpmConfigHook,
   # self là flake self-reference (chỉ có khi gọi từ flake.nix).
   # Khi gọi từ NixOS/HM module, self = null và src fallback về cleanSource.
   self ? null,
@@ -19,7 +21,7 @@ let
   src = if self != null then self else lib.cleanSource ./..;
 
   # -----------------------------------------------------------------------
-  # Frontend dependencies — dùng pnpm.fetchDeps (cách chính thức nixpkgs)
+  # Frontend dependencies — dùng fetchPnpmDeps (top-level, không deprecated)
   # Đây là fixed-output derivation, có network access + SSL certs đúng.
   #
   # Lần đầu build sẽ báo lỗi hash mismatch kiểu:
@@ -27,8 +29,10 @@ let
   #   got:       sha256-xxxx...
   # Thay lib.fakeHash bằng hash thực tế đó.
   # -----------------------------------------------------------------------
-  pnpmDeps = pkgs.pnpm.fetchDeps {
+  pnpmDeps = fetchPnpmDeps {
     inherit pname version src;
+    # fetcherVersion = 2 dùng cho pnpm lockfile v9+ (pnpm >= v9)
+    fetcherVersion = 2;
     hash = lib.fakeHash;
   };
 
@@ -42,7 +46,7 @@ let
 
     nativeBuildInputs = with pkgs; [
       nodejs
-      pnpm.configHook
+      pnpmConfigHook
     ];
 
     buildPhase = ''
