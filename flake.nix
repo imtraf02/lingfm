@@ -1,5 +1,5 @@
 {
-  description = "LingFM - A Tauri-based File Manager";
+  description = "LingFM - A modern file manager built with Tauri v2, React 19, and Rust";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -10,76 +10,35 @@
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, rust-overlay, ... }:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         overlays = [ (import rust-overlay) ];
-        pkgs = import nixpkgs {
-          inherit system overlays;
-        };
-
-        libraries = with pkgs; [
-          webkitgtk_4_1
-          gtk3
-          cairo
-          gdk-pixbuf
-          glib
-          dbus
-          openssl
-          librsvg
-          libsoup_3
-          at-spi2-atk
-          atk
-          gdk-pixbuf
-          pango
-          harfbuzz
-        ];
-
-        packages = with pkgs; [
-          curl
-          wget
-          pkg-config
-          dbus
-          openssl
-          glib
-          gtk3
-          libsoup_3
-          webkitgtk_4_1
-          librsvg
-          
-          # Development tools
-          (rust-bin.stable.latest.default.override {
-            extensions = [ "rust-src" "rust-analyzer" ];
-          })
-          nodejs
-          pnpm
-          fzf
-          
-          # Useful for Tauri
-          appimage-run
-        ];
-in
+        pkgs = import nixpkgs { inherit system overlays; };
+      in
       {
-        devShells.default = pkgs.mkShell {
-          buildInputs = packages;
+        # Nix package
+        packages.default = pkgs.callPackage ./nix/package.nix { inherit self; };
+        packages.lingfm   = pkgs.callPackage ./nix/package.nix { inherit self; };
 
-          shellHook = ''
-            export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath libraries}:$LD_LIBRARY_PATH
-            export XDG_DATA_DIRS=${pkgs.gsettings-desktop-schemas}/share/gsettings-data-schemas:${pkgs.gtk3}/share/gsettings-data-schemas:$XDG_DATA_DIRS
-            
-            echo "LingFM Development Environment Loaded!"
-            echo "Rust: $(rustc --version)"
-            echo "Node: $(node --version)"
-            echo "Pnpm: $(pnpm --version)"
-          '';
-        };
+        # Dev shell
+        devShells.default = pkgs.callPackage ./nix/default.nix { };
 
-        # Placeholder for package - building Tauri apps in Nix is non-trivial 
-        # but we can provide the derivation path once implemented
-        packages.default = pkgs.callPackage ./nix/package.nix { };
+        # Formatter
+        formatter = pkgs.nixfmt-rfc-style;
       }
     ) // {
-      nixosModules.default = import ./nix/module.nix self;
-      homeModules.default = import ./nix/hm-module.nix self;
+      # NixOS module
+      nixosModules.default = import ./nix/module.nix;
+      nixosModules.lingfm  = import ./nix/module.nix;
+
+      # Home Manager module
+      homeModules.default = import ./nix/hm-module.nix;
+      homeModules.lingfm  = import ./nix/hm-module.nix;
+
+      # Overlay để thêm lingfm vào pkgs
+      overlays.default = final: prev: {
+        lingfm = final.callPackage ./nix/package.nix { self = self; };
+      };
     };
 }
