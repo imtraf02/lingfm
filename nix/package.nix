@@ -89,7 +89,7 @@ pkgs.rustPlatform.buildRustPackage {
   # -----------------------------------------------------------------------
   nativeBuildInputs = with pkgs; [
     pkg-config
-    wrapGAppsHook
+    wrapGAppsHook3
     gobject-introspection
   ];
 
