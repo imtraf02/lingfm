@@ -1,6 +1,10 @@
 { lib
 , rustPlatform
+, fetchPnpmDeps
+, pnpmConfigHook
 , pkg-config
+, nodejs
+, pnpm
 , webkitgtk_4_1
 , gtk3
 , cairo
@@ -10,10 +14,6 @@
 , openssl
 , librsvg
 , libsoup_3
-, nodejs
-, pnpm
-, fetchPnpmDeps
-, pnpmConfigHook
 , makeDesktopItem
 , copyDesktopItems
 }:
@@ -24,15 +24,13 @@ rustPlatform.buildRustPackage rec {
 
   src = lib.cleanSource ../.;
 
-  # This is required for pnpmConfigHook to work
-  # It fetches all node_modules dependencies and creates a fixed-output derivation
+  sourceRoot = "source";
+
+  # Standard way to fetch pnpm dependencies
   pnpmDeps = fetchPnpmDeps {
     inherit pname src;
-    hash = "sha256-Ix3f9mvX0zkANvEwQN6X1t6xQA8V5IyUuy+GMEhNELo=";
-    fetcherVersion = 3;
+    hash = "sha256-Ix3f9mvX0zkANvEwQN6X1t6xQA8V5IyUuy+GMEhNELo="; # Giữ lại hash cũ của bạn
   };
-
-  sourceRoot = "source";
 
   cargoRoot = "src-tauri";
 
@@ -40,19 +38,12 @@ rustPlatform.buildRustPackage rec {
     lockFile = ../src-tauri/Cargo.lock;
   };
 
-  # Enforce strict offline mode for pnpm and other tools
-  env = {
-    PNPM_CONFIG_OFFLINE = "true";
-    PNPM_CONFIG_UPDATE_NOTIFIER = "false";
-    CHECK_FOR_UPDATES = "false";
-  };
-
   nativeBuildInputs = [
     pkg-config
     nodejs
-    pnpm
-    pnpmConfigHook
+    pnpm.configHook
     copyDesktopItems
+    rustPlatform.cargoSetupPostPatchHook
   ];
 
   buildInputs = [
@@ -67,6 +58,9 @@ rustPlatform.buildRustPackage rec {
     libsoup_3
   ];
 
+  # Tauri v2 environment variables
+  EVENT_NO_DELAYS = "1";
+
   postPatch = ''
     substituteInPlace src-tauri/tauri.conf.json \
       --replace-fail '"beforeBuildCommand": "pnpm build"' '"beforeBuildCommand": ""'
@@ -74,12 +68,10 @@ rustPlatform.buildRustPackage rec {
 
   preBuild = ''
     # Build frontend
-    pnpm build --offline
+    pnpm build
+    # Go back to backend root for cargo
     cd src-tauri
   '';
-
-  # Tauri specific environment variables
-  TAURI_SKIP_DEVSHELL_CHECK = "true";
 
   desktopItems = [
     (makeDesktopItem {
