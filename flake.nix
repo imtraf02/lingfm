@@ -80,6 +80,6 @@ in
       }
     ) // {
       nixosModules.default = import ./nix/module.nix self;
-      homeManagerModules.default = import ./nix/hm-module.nix self;
+      homeModules.default = import ./nix/hm-module.nix self;
     };
 }
