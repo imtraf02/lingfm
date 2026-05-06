@@ -70,8 +70,8 @@ pkgs.rustPlatform.buildRustPackage {
     lockFile = "${src}/src-tauri/Cargo.lock";
   };
 
-  # Chỉ build crate Tauri backend
-  buildAndTestSubdir = "src-tauri";
+  # Cargo workspace root nằm trong src-tauri/
+  cargoRoot = "src-tauri";
 
   # -----------------------------------------------------------------------
   # Build inputs
