@@ -23,6 +23,13 @@ rustPlatform.buildRustPackage rec {
 
   src = lib.cleanSource ../.;
 
+  # This is required for pnpmConfigHook to work
+  # It fetches all node_modules dependencies and creates a fixed-output derivation
+  pnpmDeps = pnpm.fetchDeps {
+    inherit pname version src;
+    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; # PLACEHOLDER: Nix will give you the real hash on first run
+  };
+
   sourceRoot = "source/src-tauri";
 
   cargoLock = {
@@ -50,7 +57,7 @@ rustPlatform.buildRustPackage rec {
 
   postPatch = ''
     substituteInPlace tauri.conf.json \
-      --replace '"beforeBuildCommand": "pnpm build"' '"beforeBuildCommand": ""'
+      --replace-fail '"beforeBuildCommand": "pnpm build"' '"beforeBuildCommand": ""'
   '';
 
   preBuild = ''
