@@ -32,10 +32,12 @@ rustPlatform.buildRustPackage rec {
     fetcherVersion = 3;
   };
 
-  sourceRoot = "source/src-tauri";
+  sourceRoot = "source";
+
+  cargoRoot = "src-tauri";
 
   cargoLock = {
-    lockFile = ../src-tauri/Cargo.lock;
+    lockFile = ./src-tauri/Cargo.lock;
   };
 
   nativeBuildInputs = [
@@ -65,9 +67,8 @@ rustPlatform.buildRustPackage rec {
 
   preBuild = ''
     # Build frontend
-    pushd ..
     pnpm build
-    popd
+    cd src-tauri
   '';
 
   # Tauri specific environment variables
