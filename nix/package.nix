@@ -29,6 +29,7 @@ rustPlatform.buildRustPackage rec {
   pnpmDeps = fetchPnpmDeps {
     inherit pname src;
     hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    fetcherVersion = 1;
   };
 
   sourceRoot = "source/src-tauri";
