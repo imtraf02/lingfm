@@ -4,8 +4,9 @@
   pkgs,
   stdenv,
   rustPlatform,
-  rust-bin ? pkgs.rust-bin,
-  self,
+  # self là flake self-reference (chỉ có khi gọi từ flake.nix).
+  # Khi gọi từ NixOS/HM module, self = null và src fallback về cleanSource.
+  self ? null,
   ...
 }:
 
@@ -22,7 +23,9 @@ let
   # -----------------------------------------------------------------------
   pname   = "lingfm";
   version = "0.1.0";
-  src     = self;
+  # Nếu được gọi từ flake.nix thì dùng flake self (bao gồm cả flake.lock),
+  # nếu không (HM/NixOS module) thì dùng cleanSource để bỏ .git và các file không cần.
+  src = if self != null then self else lib.cleanSource ./..;
 
   # -----------------------------------------------------------------------
   # Frontend build (pnpm + vite)
