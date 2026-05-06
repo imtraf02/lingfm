@@ -46,6 +46,7 @@ let
 
     nativeBuildInputs = with pkgs; [
       nodejs
+      pnpm
       pnpmConfigHook
     ];
 
