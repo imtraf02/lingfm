@@ -28,8 +28,8 @@ rustPlatform.buildRustPackage rec {
   # It fetches all node_modules dependencies and creates a fixed-output derivation
   pnpmDeps = fetchPnpmDeps {
     inherit pname src;
-    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
-    fetcherVersion = 1;
+    hash = "sha256-Ix3f9mvX0zkANvEwQN6X1t6xQA8V5IyUuy+GMEhNELo=";
+    fetcherVersion = 3;
   };
 
   sourceRoot = "source/src-tauri";
