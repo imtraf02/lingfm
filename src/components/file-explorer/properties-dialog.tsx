@@ -42,25 +42,25 @@ function formatDate(ts: number): string {
 function formatMode(mode?: number): string {
 	if (mode === undefined) return "";
 	let out = "";
-	out += (mode & 0o400) ? "r" : "-";
-	out += (mode & 0o200) ? "w" : "-";
-	out += (mode & 0o100) ? "x" : "-";
-	out += (mode & 0o040) ? "r" : "-";
-	out += (mode & 0o020) ? "w" : "-";
-	out += (mode & 0o010) ? "x" : "-";
-	out += (mode & 0o004) ? "r" : "-";
-	out += (mode & 0o002) ? "w" : "-";
-	out += (mode & 0o001) ? "x" : "-";
+	out += mode & 0o400 ? "r" : "-";
+	out += mode & 0o200 ? "w" : "-";
+	out += mode & 0o100 ? "x" : "-";
+	out += mode & 0o040 ? "r" : "-";
+	out += mode & 0o020 ? "w" : "-";
+	out += mode & 0o010 ? "x" : "-";
+	out += mode & 0o004 ? "r" : "-";
+	out += mode & 0o002 ? "w" : "-";
+	out += mode & 0o001 ? "x" : "-";
 	return out;
 }
 
 function Row({ label, value }: { label: string; value: string }) {
 	return (
 		<div className="flex flex-col gap-0.5">
-			<span className="text-[11px] uppercase tracking-widest text-muted-foreground/60 font-semibold">
+			<span className="font-semibold text-[11px] text-muted-foreground/60 uppercase tracking-widest">
 				{label}
 			</span>
-			<span className="text-sm text-foreground break-all">{value}</span>
+			<span className="break-all text-foreground text-sm">{value}</span>
 		</div>
 	);
 }
@@ -101,10 +101,10 @@ export function PropertiesDialog({
 						{entry?.is_dir ? (
 							<FolderIcon
 								size={22}
-								className="text-blue-500 fill-blue-500/20 shrink-0"
+								className="shrink-0 fill-blue-500/20 text-blue-500"
 							/>
 						) : (
-							<FileIcon size={22} className="text-muted-foreground shrink-0" />
+							<FileIcon size={22} className="shrink-0 text-muted-foreground" />
 						)}
 						<span className="truncate">{entry?.name}</span>
 					</DialogTitle>
@@ -112,13 +112,13 @@ export function PropertiesDialog({
 
 				<div className="mt-2">
 					{loading && (
-						<div className="flex items-center justify-center py-8 gap-2 text-muted-foreground">
+						<div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
 							<Loader2 size={18} className="animate-spin" />
 							<span className="text-sm">Loading properties…</span>
 						</div>
 					)}
 
-					{error && <p className="text-sm text-destructive py-4">{error}</p>}
+					{error && <p className="py-4 text-destructive text-sm">{error}</p>}
 
 					{props && !loading && (
 						<div className="space-y-4 divide-y divide-border">
@@ -169,7 +169,9 @@ export function PropertiesDialog({
 									value={
 										entry?.mode !== undefined
 											? `${props.is_readonly ? "Read only" : "Read & Write"} (${formatMode(entry.mode)})`
-											: props.is_readonly ? "Read only" : "Read & Write"
+											: props.is_readonly
+												? "Read only"
+												: "Read & Write"
 									}
 								/>
 							</div>

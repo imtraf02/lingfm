@@ -1,5 +1,5 @@
-import { ListRestart, Search, Plus, Hash, Type } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Hash, ListRestart, Plus, Search, Type } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -9,16 +9,16 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import type { RichFileEntry as FileEntry } from "@/types/fs";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { RichFileEntry as FileEntry } from "@/types/fs";
 
 interface BulkRenameDialogProps {
 	open: boolean;
 	entries: FileEntry[];
 	onClose: () => void;
-	onRename: (mappings: { from: string, to: string }[]) => void;
+	onRename: (mappings: { from: string; to: string }[]) => void;
 }
 
 export function BulkRenameDialog({
@@ -34,7 +34,9 @@ export function BulkRenameDialog({
 	const [suffix, setSuffix] = useState("");
 	const [seqPattern, setSeqPattern] = useState("item_#");
 	const [seqStart, setSeqStart] = useState(1);
-	const [activeTab, setActiveTab] = useState<"manual" | "replace" | "prefix" | "sequence">("manual");
+	const [activeTab, setActiveTab] = useState<
+		"manual" | "replace" | "prefix" | "sequence"
+	>("manual");
 
 	useEffect(() => {
 		if (open) {
@@ -55,7 +57,7 @@ export function BulkRenameDialog({
 	const applyReplace = () => {
 		if (!findText) return;
 		const updated = newNames.map((name) =>
-			name.split(findText).join(replaceText)
+			name.split(findText).join(replaceText),
 		);
 		setNewNames(updated);
 	};
@@ -87,10 +89,12 @@ export function BulkRenameDialog({
 	};
 
 	const handleConfirm = () => {
-		const mappings = entries.map((entry, index) => ({
-			from: entry.path,
-			to: newNames[index] || entry.name,
-		})).filter(m => m.to !== entries.find(e => e.path === m.from)?.name);
+		const mappings = entries
+			.map((entry, index) => ({
+				from: entry.path,
+				to: newNames[index] || entry.name,
+			}))
+			.filter((m) => m.to !== entries.find((e) => e.path === m.from)?.name);
 
 		if (mappings.length > 0) {
 			onRename(mappings);
@@ -103,19 +107,26 @@ export function BulkRenameDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-			<DialogContent className="max-w-4xl bg-[var(--popover)] border-[var(--border)] rounded-[calc(var(--radius)*2)] shadow-2xl overflow-hidden flex flex-col h-[600px]">
-				<DialogHeader className="px-6 py-4 border-b border-border bg-accent/10">
-					<DialogTitle className="flex items-center justify-between text-sm font-medium text-foreground">
+			<DialogContent className="flex h-[600px] max-w-4xl flex-col overflow-hidden rounded-[calc(var(--radius)*2)] border-[var(--border)] bg-[var(--popover)] shadow-2xl">
+				<DialogHeader className="border-border border-b bg-accent/10 px-6 py-4">
+					<DialogTitle className="flex items-center justify-between font-medium text-foreground text-sm">
 						<div className="flex items-center gap-2.5">
-							<div className="w-8 h-8 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+							<div className="flex h-8 w-8 items-center justify-center rounded-xl border border-primary/20 bg-primary/10">
 								<ListRestart size={16} className="text-primary" />
 							</div>
 							<div>
 								<p>Bulk Rename</p>
-								<p className="text-[10px] text-muted-foreground font-normal">{entries.length} items selected</p>
+								<p className="font-normal text-[10px] text-muted-foreground">
+									{entries.length} items selected
+								</p>
 							</div>
 						</div>
-						<Button variant="ghost" size="sm" onClick={resetNames} className="h-8 text-[10px] uppercase tracking-wider font-bold">
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={resetNames}
+							className="h-8 font-bold text-[10px] uppercase tracking-wider"
+						>
 							Reset to Original
 						</Button>
 					</DialogTitle>
@@ -123,62 +134,172 @@ export function BulkRenameDialog({
 
 				<div className="flex flex-1 overflow-hidden">
 					{/* Left Sidebar: Tools */}
-					<div className="w-64 border-r border-border bg-accent/5 p-4 flex flex-col gap-6">
+					<div className="flex w-64 flex-col gap-6 border-border border-r bg-accent/5 p-4">
 						<section className="space-y-3">
-							<h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-1">Operations</h4>
+							<h4 className="px-1 font-bold text-[10px] text-muted-foreground uppercase tracking-widest">
+								Operations
+							</h4>
 							<div className="flex flex-col gap-1">
-								<ToolButton active={activeTab === "manual"} onClick={() => setActiveTab("manual")} icon={<Type size={14} />} label="Manual Edit" />
-								<ToolButton active={activeTab === "replace"} onClick={() => setActiveTab("replace")} icon={<Search size={14} />} label="Find & Replace" />
-								<ToolButton active={activeTab === "prefix"} onClick={() => setActiveTab("prefix")} icon={<Plus size={14} />} label="Prefix & Suffix" />
-								<ToolButton active={activeTab === "sequence"} onClick={() => setActiveTab("sequence")} icon={<Hash size={14} />} label="Sequence" />
+								<ToolButton
+									active={activeTab === "manual"}
+									onClick={() => setActiveTab("manual")}
+									icon={<Type size={14} />}
+									label="Manual Edit"
+								/>
+								<ToolButton
+									active={activeTab === "replace"}
+									onClick={() => setActiveTab("replace")}
+									icon={<Search size={14} />}
+									label="Find & Replace"
+								/>
+								<ToolButton
+									active={activeTab === "prefix"}
+									onClick={() => setActiveTab("prefix")}
+									icon={<Plus size={14} />}
+									label="Prefix & Suffix"
+								/>
+								<ToolButton
+									active={activeTab === "sequence"}
+									onClick={() => setActiveTab("sequence")}
+									icon={<Hash size={14} />}
+									label="Sequence"
+								/>
 							</div>
 						</section>
 
-						<div className="flex-1 flex flex-col justify-center">
+						<div className="flex flex-1 flex-col justify-center">
 							{activeTab === "replace" && (
-								<div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-200">
+								<div className="fade-in slide-in-from-left-2 animate-in space-y-4 duration-200">
 									<div className="space-y-1.5">
-										<label className="text-[10px] font-bold text-muted-foreground ml-1">Find</label>
-										<Input value={findText} onChange={(e) => setFindText(e.target.value)} className="h-8 text-xs bg-background" placeholder="Text to find..." />
+										<label
+											htmlFor="find-text"
+											className="ml-1 font-bold text-[10px] text-muted-foreground"
+										>
+											Find
+										</label>
+										<Input
+											id="find-text"
+											value={findText}
+											onChange={(e) => setFindText(e.target.value)}
+											className="h-8 bg-background text-xs"
+											placeholder="Text to find..."
+										/>
 									</div>
 									<div className="space-y-1.5">
-										<label className="text-[10px] font-bold text-muted-foreground ml-1">Replace</label>
-										<Input value={replaceText} onChange={(e) => setReplaceText(e.target.value)} className="h-8 text-xs bg-background" placeholder="New text..." />
+										<label
+											htmlFor="replace-text"
+											className="ml-1 font-bold text-[10px] text-muted-foreground"
+										>
+											Replace
+										</label>
+										<Input
+											id="replace-text"
+											value={replaceText}
+											onChange={(e) => setReplaceText(e.target.value)}
+											className="h-8 bg-background text-xs"
+											placeholder="New text..."
+										/>
 									</div>
-									<Button onClick={applyReplace} disabled={!findText} className="w-full h-8 text-xs">Apply Replace</Button>
+									<Button
+										type="button"
+										onClick={applyReplace}
+										disabled={!findText}
+										className="h-8 w-full text-xs"
+									>
+										Apply Replace
+									</Button>
 								</div>
 							)}
 
 							{activeTab === "prefix" && (
-								<div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-200">
+								<div className="fade-in slide-in-from-left-2 animate-in space-y-4 duration-200">
 									<div className="space-y-1.5">
-										<label className="text-[10px] font-bold text-muted-foreground ml-1">Prefix</label>
-										<Input value={prefix} onChange={(e) => setPrefix(e.target.value)} className="h-8 text-xs bg-background" placeholder="Add to start..." />
+										<label
+											htmlFor="prefix-text"
+											className="ml-1 font-bold text-[10px] text-muted-foreground"
+										>
+											Prefix
+										</label>
+										<Input
+											id="prefix-text"
+											value={prefix}
+											onChange={(e) => setPrefix(e.target.value)}
+											className="h-8 bg-background text-xs"
+											placeholder="Add to start..."
+										/>
 									</div>
 									<div className="space-y-1.5">
-										<label className="text-[10px] font-bold text-muted-foreground ml-1">Suffix</label>
-										<Input value={suffix} onChange={(e) => setSuffix(e.target.value)} className="h-8 text-xs bg-background" placeholder="Add to end..." />
+										<label
+											htmlFor="suffix-text"
+											className="ml-1 font-bold text-[10px] text-muted-foreground"
+										>
+											Suffix
+										</label>
+										<Input
+											id="suffix-text"
+											value={suffix}
+											onChange={(e) => setSuffix(e.target.value)}
+											className="h-8 bg-background text-xs"
+											placeholder="Add to end..."
+										/>
 									</div>
-									<Button onClick={applyPrefixSuffix} disabled={!prefix && !suffix} className="w-full h-8 text-xs">Apply Prefix/Suffix</Button>
+									<Button
+										type="button"
+										onClick={applyPrefixSuffix}
+										disabled={!prefix && !suffix}
+										className="h-8 w-full text-xs"
+									>
+										Apply Prefix/Suffix
+									</Button>
 								</div>
 							)}
 
 							{activeTab === "sequence" && (
-								<div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-200">
+								<div className="fade-in slide-in-from-left-2 animate-in space-y-4 duration-200">
 									<div className="space-y-1.5">
-										<label className="text-[10px] font-bold text-muted-foreground ml-1">Pattern (# for number)</label>
-										<Input value={seqPattern} onChange={(e) => setSeqPattern(e.target.value)} className="h-8 text-xs bg-background" placeholder="img_#" />
+										<label
+											htmlFor="seq-pattern"
+											className="ml-1 font-bold text-[10px] text-muted-foreground"
+										>
+											Pattern (# for number)
+										</label>
+										<Input
+											id="seq-pattern"
+											value={seqPattern}
+											onChange={(e) => setSeqPattern(e.target.value)}
+											className="h-8 bg-background text-xs"
+											placeholder="img_#"
+										/>
 									</div>
 									<div className="space-y-1.5">
-										<label className="text-[10px] font-bold text-muted-foreground ml-1">Start from</label>
-										<Input type="number" value={seqStart} onChange={(e) => setSeqStart(parseInt(e.target.value) || 1)} className="h-8 text-xs bg-background" />
+										<label
+											htmlFor="seq-start"
+											className="ml-1 font-bold text-[10px] text-muted-foreground"
+										>
+											Start from
+										</label>
+										<Input
+											id="seq-start"
+											type="number"
+											value={seqStart}
+											onChange={(e) =>
+												setSeqStart(parseInt(e.target.value, 10) || 1)
+											}
+											className="h-8 bg-background text-xs"
+										/>
 									</div>
-									<Button onClick={applySequence} className="w-full h-8 text-xs">Generate Sequence</Button>
+									<Button
+										type="button"
+										onClick={applySequence}
+										className="h-8 w-full text-xs"
+									>
+										Generate Sequence
+									</Button>
 								</div>
 							)}
 
 							{activeTab === "manual" && (
-								<p className="text-[11px] text-muted-foreground italic text-center px-4">
+								<p className="px-4 text-center text-[11px] text-muted-foreground italic">
 									Edit the names directly in the preview area on the right.
 								</p>
 							)}
@@ -186,25 +307,33 @@ export function BulkRenameDialog({
 					</div>
 
 					{/* Right Area: Preview/Editor */}
-					<div className="flex-1 flex flex-col overflow-hidden bg-background">
-						<div className="grid grid-cols-2 flex-1 overflow-hidden">
-							<div className="border-r border-border flex flex-col overflow-hidden">
-								<div className="h-8 flex items-center px-4 bg-accent/5 border-b border-border">
-									<span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Original</span>
+					<div className="flex flex-1 flex-col overflow-hidden bg-background">
+						<div className="grid flex-1 grid-cols-2 overflow-hidden">
+							<div className="flex flex-col overflow-hidden border-border border-r">
+								<div className="flex h-8 items-center border-border border-b bg-accent/5 px-4">
+									<span className="font-bold text-[10px] text-muted-foreground uppercase tracking-wider">
+										Original
+									</span>
 								</div>
-								<ScrollArea className="flex-1 p-4 font-mono text-[11px] text-muted-foreground/60 leading-relaxed whitespace-pre select-none">
+								<ScrollArea className="flex-1 select-none whitespace-pre p-4 font-mono text-[11px] text-muted-foreground/60 leading-relaxed">
 									{entries.map((e) => e.name).join("\n")}
 								</ScrollArea>
 							</div>
 							<div className="flex flex-col overflow-hidden bg-accent/5">
-								<div className="h-8 flex items-center px-4 bg-accent/5 border-b border-border justify-between">
-									<span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">New Names</span>
-									{isCountMismatch && <span className="text-[10px] text-destructive font-bold">Line mismatch!</span>}
+								<div className="flex h-8 items-center justify-between border-border border-b bg-accent/5 px-4">
+									<span className="font-bold text-[10px] text-muted-foreground uppercase tracking-wider">
+										New Names
+									</span>
+									{isCountMismatch && (
+										<span className="font-bold text-[10px] text-destructive">
+											Line mismatch!
+										</span>
+									)}
 								</div>
 								<Textarea
 									value={textareaValue}
 									onChange={(e) => handleTextareaChange(e.target.value)}
-									className="flex-1 bg-transparent border-none focus-visible:ring-0 text-foreground rounded-none font-mono text-[11px] leading-relaxed p-4 resize-none"
+									className="flex-1 resize-none rounded-none border-none bg-transparent p-4 font-mono text-[11px] text-foreground leading-relaxed focus-visible:ring-0"
 									placeholder="Each line is a new name..."
 									spellCheck={false}
 								/>
@@ -213,12 +342,16 @@ export function BulkRenameDialog({
 					</div>
 				</div>
 
-				<DialogFooter className="px-6 py-4 border-t border-border bg-accent/10 gap-3">
-					<Button variant="ghost" onClick={onClose} className="h-9 text-xs">Cancel</Button>
+				<DialogFooter className="gap-3 border-border border-t bg-accent/10 px-6 py-4">
+					<Button variant="ghost" onClick={onClose} className="h-9 text-xs">
+						Cancel
+					</Button>
 					<Button
 						onClick={handleConfirm}
-						disabled={isCountMismatch || entries.every((e, i) => e.name === newNames[i])}
-						className="h-9 text-xs px-8 bg-primary text-primary-foreground hover:opacity-90 shadow-md"
+						disabled={
+							isCountMismatch || entries.every((e, i) => e.name === newNames[i])
+						}
+						className="h-9 bg-primary px-8 text-primary-foreground text-xs shadow-md hover:opacity-90"
 					>
 						Apply All Changes
 					</Button>
@@ -228,15 +361,26 @@ export function BulkRenameDialog({
 	);
 }
 
-function ToolButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+function ToolButton({
+	active,
+	onClick,
+	icon,
+	label,
+}: {
+	active: boolean;
+	onClick: () => void;
+	icon: React.ReactNode;
+	label: string;
+}) {
 	return (
 		<button
+			type="button"
 			onClick={onClick}
 			className={cn(
-				"flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200",
+				"flex items-center gap-2.5 rounded-lg px-3 py-2 font-medium text-xs transition-all duration-200",
 				active
 					? "bg-primary text-primary-foreground shadow-sm"
-					: "text-muted-foreground hover:bg-accent hover:text-foreground"
+					: "text-muted-foreground hover:bg-accent hover:text-foreground",
 			)}
 		>
 			{icon}

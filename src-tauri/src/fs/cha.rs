@@ -1,5 +1,3 @@
-/// File metadata ("Cha") structures – inspired by yazi-fs/src/cha/
-/// Ported & simplified for use without the full yazi dependency chain.
 use std::{
     fs::Metadata,
     path::Path,
@@ -7,8 +5,6 @@ use std::{
 };
 
 use serde::Serialize;
-
-// ─── File type ───────────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -31,8 +27,6 @@ impl FileType {
     pub fn is_link(self) -> bool { matches!(self, Self::Link) }
 }
 
-// ─── Rich file attributes (analogous to yazi_fs::Cha) ────────────────────────
-
 #[derive(Clone, Debug)]
 pub struct Cha {
     pub file_type: FileType,
@@ -43,9 +37,8 @@ pub struct Cha {
     pub mtime:     Option<SystemTime>,
     pub is_hidden: bool,
     pub is_link:   bool,
-    pub is_orphan: bool, // symlink whose target doesn't exist
+    pub is_orphan: bool,
     pub link_to:   Option<String>,
-    // Unix-only fields (zero on non-unix)
     pub mode:  u32,
     pub uid:   u32,
     pub gid:   u32,
@@ -53,8 +46,6 @@ pub struct Cha {
 }
 
 impl Cha {
-    /// Build from `std::fs::symlink_metadata` + optional follow metadata.
-    /// `name` is just the filename component (for hidden-dot detection on Unix).
     pub fn from_meta(name: &str, lmeta: &Metadata, followed: Option<&Metadata>) -> Self {
         #[cfg(unix)]
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -63,7 +54,6 @@ impl Cha {
         let meta = followed.unwrap_or(lmeta);
 
         let file_type = if is_link && followed.is_none() {
-            // Symlink with no follow target = orphan
             FileType::Link
         } else if meta.is_dir() {
             FileType::Dir
@@ -92,7 +82,7 @@ impl Cha {
 
         #[cfg(unix)]
         let (mode, uid, gid, nlink, ctime) = {
-            let m = lmeta; // use symlink meta for unix attrs
+            let m = lmeta;
             let ctime_sys = UNIX_EPOCH
                 .checked_add(std::time::Duration::new(m.ctime() as u64, m.ctime_nsec() as u32));
             (
@@ -106,7 +96,6 @@ impl Cha {
         #[cfg(not(unix))]
         let (mode, uid, gid, nlink, ctime) = (0u32, 0u32, 0u32, 0u64, None::<SystemTime>);
 
-        // Hidden: dot-file on Unix; HIDDEN attribute on Windows
         #[allow(unused_assignments)]
         let mut is_hidden = false;
 
@@ -131,7 +120,7 @@ impl Cha {
             is_hidden,
             is_link,
             is_orphan: is_link && followed.is_none(),
-            link_to: None, // filled separately
+            link_to: None,
             mode,
             uid,
             gid,
@@ -140,19 +129,15 @@ impl Cha {
     }
 }
 
-// ─── Helper: SystemTime → Unix timestamp (seconds) ───────────────────────────
-
 pub fn systime_secs(t: Option<SystemTime>) -> Option<u64> {
     t?.duration_since(UNIX_EPOCH).ok().map(|d| d.as_secs())
 }
 
-/// Build `Cha` for a given path, handling symlinks correctly.
-/// Uses `symlink_metadata` first, then optionally `metadata` to follow the link.
 pub fn read_cha(path: &Path) -> std::io::Result<Cha> {
     let lmeta = path.symlink_metadata()?;
     let (followed, link_to) = if lmeta.file_type().is_symlink() {
         let target = std::fs::read_link(path).ok();
-        let followed = std::fs::metadata(path).ok(); // None if dangling
+        let followed = std::fs::metadata(path).ok();
         (followed, target.map(|t| t.to_string_lossy().into_owned()))
     } else {
         (None, None)

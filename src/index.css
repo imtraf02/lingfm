@@ -79,8 +79,8 @@ input[type="number"] {
 	body,
 	#root,
 	.print\:block * {
-		background: #ffffff !important;
-		background-color: #ffffff !important;
+		background: #ffffff;
+		background-color: #ffffff;
 	}
 	@page {
 		size: A5;

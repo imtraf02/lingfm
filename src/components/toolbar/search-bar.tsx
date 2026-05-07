@@ -39,13 +39,13 @@ export function SearchBar({
 	};
 
 	return (
-		<div className="flex-1 flex items-center gap-2 animate-in fade-in duration-150 h-full min-w-0">
+		<div className="fade-in flex h-full min-w-0 flex-1 animate-in items-center gap-2 duration-150">
 			{/* Search input */}
-			<div className="flex-1 flex items-center gap-2 h-full min-w-0">
+			<div className="flex h-full min-w-0 flex-1 items-center gap-2">
 				{isSearching ? (
-					<div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
+					<div className="h-3 w-3 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent" />
 				) : (
-					<Search size={13} className="text-primary shrink-0" />
+					<Search size={13} className="shrink-0 text-primary" />
 				)}
 				<input
 					ref={inputRef}
@@ -57,15 +57,15 @@ export function SearchBar({
 						mode === "filter"
 							? `Search in ${currentFolder}…`
 							: mode === "global"
-							? "Global search in Home…"
-							: "Deep search Subdirectories…"
+								? "Global search in Home…"
+								: "Deep search Subdirectories…"
 					}
-					className="flex-1 bg-transparent text-[12px] font-mono outline-none placeholder:text-muted-foreground/40 min-w-0"
+					className="min-w-0 flex-1 bg-transparent font-mono text-[12px] outline-none placeholder:text-muted-foreground/40"
 				/>
 			</div>
 
 			{/* Mode toggle tags */}
-			<div className="flex items-center gap-1 shrink-0">
+			<div className="flex shrink-0 items-center gap-1">
 				<button
 					type="button"
 					onClick={(e) => {
@@ -73,10 +73,10 @@ export function SearchBar({
 						onModeChange("filter");
 					}}
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tight transition-all border",
+						"rounded border px-1.5 py-0.5 font-bold text-[10px] uppercase tracking-tight transition-all",
 						mode === "filter"
-							? "bg-primary/10 text-primary border-primary/20"
-							: "text-muted-foreground/60 border-transparent hover:text-foreground",
+							? "border-primary/20 bg-primary/10 text-primary"
+							: "border-transparent text-muted-foreground/60 hover:text-foreground",
 					)}
 				>
 					Filter
@@ -88,10 +88,10 @@ export function SearchBar({
 						onModeChange("deep");
 					}}
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tight transition-all border",
+						"rounded border px-1.5 py-0.5 font-bold text-[10px] uppercase tracking-tight transition-all",
 						mode === "deep"
-							? "bg-purple-500/10 text-purple-400 border-purple-500/20"
-							: "text-muted-foreground/60 border-transparent hover:text-foreground",
+							? "border-purple-500/20 bg-purple-500/10 text-purple-400"
+							: "border-transparent text-muted-foreground/60 hover:text-foreground",
 					)}
 				>
 					Deep
@@ -103,10 +103,10 @@ export function SearchBar({
 						onModeChange("global");
 					}}
 					className={cn(
-						"text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-tight transition-all border",
+						"rounded border px-1.5 py-0.5 font-bold text-[10px] uppercase tracking-tight transition-all",
 						mode === "global"
-							? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-							: "text-muted-foreground/60 border-transparent hover:text-foreground",
+							? "border-amber-500/20 bg-amber-500/10 text-amber-500"
+							: "border-transparent text-muted-foreground/60 hover:text-foreground",
 					)}
 				>
 					Global
@@ -120,7 +120,7 @@ export function SearchBar({
 						e.stopPropagation();
 						onClear();
 					}}
-					className="text-muted-foreground hover:text-foreground transition-colors shrink-0 p-1"
+					className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
 				>
 					<X size={13} />
 				</button>

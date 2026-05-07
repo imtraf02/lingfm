@@ -52,3 +52,22 @@ pub async fn async_rename(
     let id = scheduler.submit_rename(path.into(), new_name).await;
     Ok(TaskQueued { id })
 }
+
+#[command]
+pub async fn async_extract(
+    path: String,
+    dest: String,
+    scheduler: State<'_, FmScheduler>,
+) -> Result<TaskQueued, String> {
+    let id = scheduler.submit_extract(path.into(), dest.into()).await;
+    Ok(TaskQueued { id })
+}
+
+#[command]
+pub async fn async_extract_here(
+    path: String,
+    scheduler: State<'_, FmScheduler>,
+) -> Result<TaskQueued, String> {
+    let id = scheduler.submit_extract_here(path.into()).await;
+    Ok(TaskQueued { id })
+}

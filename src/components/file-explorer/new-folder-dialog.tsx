@@ -44,10 +44,10 @@ export function NewFolderDialog({
 				else onClose();
 			}}
 		>
-			<DialogContent className="max-w-sm bg-[var(--popover)] border-[var(--border)] rounded-[calc(var(--radius)*2)] shadow-lg">
+			<DialogContent className="max-w-sm rounded-[calc(var(--radius)*2)] border-[var(--border)] bg-[var(--popover)] shadow-lg">
 				<DialogHeader>
-					<DialogTitle className="flex items-center gap-2.5 text-sm font-medium text-foreground">
-						<div className="w-7 h-7 rounded-lg bg-accent border border-[var(--border)] flex items-center justify-center">
+					<DialogTitle className="flex items-center gap-2.5 font-medium text-foreground text-sm">
+						<div className="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--border)] bg-accent">
 							<FolderPlus size={14} className="text-[var(--primary)]" />
 						</div>
 						New Folder
@@ -63,7 +63,7 @@ export function NewFolderDialog({
 						if (e.key === "Escape") onClose();
 					}}
 					placeholder="Folder name"
-					className="mt-3 bg-[var(--input)] border-[var(--border)] focus-visible:ring-[var(--ring)] text-foreground placeholder:text-muted-foreground rounded-lg text-sm font-mono"
+					className="mt-3 rounded-lg border-[var(--border)] bg-[var(--input)] font-mono text-foreground text-sm placeholder:text-muted-foreground focus-visible:ring-[var(--ring)]"
 					autoFocus
 				/>
 
@@ -71,14 +71,14 @@ export function NewFolderDialog({
 					<Button
 						variant="ghost"
 						onClick={onClose}
-						className="text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg text-xs h-8"
+						className="h-8 rounded-lg text-muted-foreground text-xs hover:bg-accent hover:text-foreground"
 					>
 						Cancel
 					</Button>
 					<Button
 						onClick={handleCreate}
 						disabled={!name.trim()}
-						className="bg-primary text-primary-foreground hover:opacity-90 rounded-lg text-xs h-8"
+						className="h-8 rounded-lg bg-primary text-primary-foreground text-xs hover:opacity-90"
 					>
 						Create
 					</Button>

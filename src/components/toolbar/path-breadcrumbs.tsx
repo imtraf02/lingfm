@@ -28,20 +28,20 @@ export function PathBreadcrumbs({
 	const displaySegments = isWindows ? segments.slice(1) : segments;
 
 	return (
-		<Breadcrumb className="flex-1 min-w-0 flex items-center px-1">
+		<Breadcrumb className="flex min-w-0 flex-1 items-center px-1">
 			<BreadcrumbList className="flex-nowrap items-center justify-center font-mono text-[12px] leading-none">
 				<BreadcrumbItem className="flex items-center">
 					<BreadcrumbLink
-						className="px-2 py-1 rounded hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground flex items-center"
+						className="flex cursor-pointer items-center rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 						onClick={(e) => {
 							e.stopPropagation();
-							onPathClick(isWindows ? segments[0] + "/" : "/");
+							onPathClick(isWindows ? `${segments[0]}/` : "/");
 						}}
 					>
 						{isWindows ? (
 							segments[0]
 						) : (
-							<Folder size={13} className="text-primary shrink-0" />
+							<Folder size={13} className="shrink-0 text-primary" />
 						)}
 					</BreadcrumbLink>
 				</BreadcrumbItem>
@@ -50,7 +50,7 @@ export function PathBreadcrumbs({
 					const isLast = index === displaySegments.length - 1;
 					const segmentPath = isWindows
 						? segments.slice(0, index + 2).join("/")
-						: "/" + segments.slice(0, index + 1).join("/");
+						: `/${segments.slice(0, index + 1).join("/")}`;
 
 					return (
 						<React.Fragment key={segmentPath}>
@@ -60,7 +60,7 @@ export function PathBreadcrumbs({
 							<BreadcrumbItem className="flex items-center">
 								{isLast ? (
 									<BreadcrumbPage
-										className="px-2 py-1 font-medium text-foreground cursor-default max-w-37.5 truncate flex items-center"
+										className="flex max-w-37.5 cursor-default items-center truncate px-2 py-1 font-medium text-foreground"
 										onClick={(e) => {
 											e.stopPropagation();
 											onFinalClick();
@@ -70,7 +70,7 @@ export function PathBreadcrumbs({
 									</BreadcrumbPage>
 								) : (
 									<BreadcrumbLink
-										className="px-2 py-1 rounded hover:bg-muted transition-colors cursor-pointer text-muted-foreground hover:text-foreground max-w-30 truncate flex items-center"
+										className="flex max-w-30 cursor-pointer items-center truncate rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
 										onClick={(e) => {
 											e.stopPropagation();
 											onPathClick(segmentPath);

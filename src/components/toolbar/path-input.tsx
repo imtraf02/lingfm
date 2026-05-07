@@ -30,30 +30,30 @@ export function PathInput({
 	};
 
 	return (
-		<div 
-			className="flex-1 flex items-center gap-2 animate-in fade-in duration-150 h-full min-w-0"
+		<div
+			className="fade-in flex h-full min-w-0 flex-1 animate-in items-center gap-2 duration-150"
 			onBlur={(e) => {
 				if (!e.currentTarget.contains(e.relatedTarget)) {
 					onClose();
 				}
 			}}
 		>
-			<div className="flex-1 flex items-center gap-2 h-full min-w-0">
-				<Folder size={13} className="text-primary shrink-0" />
+			<div className="flex h-full min-w-0 flex-1 items-center gap-2">
+				<Folder size={13} className="shrink-0 text-primary" />
 				<input
 					ref={inputRef}
 					type="text"
 					value={path}
 					onChange={(e) => setPath(e.target.value)}
 					onKeyDown={handleKeyDown}
-					className="flex-1 bg-transparent text-[12px] font-mono outline-none text-foreground min-w-0"
+					className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-foreground outline-none"
 					placeholder="Enter path..."
 				/>
 			</div>
 			<button
 				type="button"
 				onClick={onClose}
-				className="text-muted-foreground hover:text-foreground transition-colors shrink-0 p-1"
+				className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
 			>
 				<X size={13} />
 			</button>

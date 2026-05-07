@@ -21,6 +21,15 @@
 				"useKeyWithClickEvents": "off",
 				"noStaticElementInteractions": "off",
 				"noSvgWithoutTitle": "off"
+			},
+			"nursery": {
+				"useSortedClasses": {
+					"options": {
+						"attributes": ["classList"],
+						"functions": ["cn", "clsx", "cva", "tw", "tw.*"]
+					},
+					"level": "error"
+				}
 			}
 		}
 	},
@@ -35,6 +44,11 @@
 			"source": {
 				"organizeImports": "on"
 			}
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
 		}
 	}
 }

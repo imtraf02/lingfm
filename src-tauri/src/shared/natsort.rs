@@ -1,6 +1,3 @@
-/// Natural sort implementation – ported from yazi-shared/src/natsort.rs
-/// Original: Copyright (c) 2023, sxyazi (MIT License)
-/// Port of Martin Pool's strnatcmp.c: http://sourcefrog.net/projects/natsort/
 use std::cmp::Ordering;
 
 macro_rules! return_unless_equal {
@@ -62,13 +59,11 @@ fn compare_right(left: &[u8], right: &[u8], li: &mut usize, ri: &mut usize) -> O
     }
 }
 
-/// Natural sort comparison: "file2" < "file10", case-insensitive when `insensitive=true`.
 pub fn natsort(left: &[u8], right: &[u8], insensitive: bool) -> Ordering {
     let mut li = 0;
     let mut ri = 0;
 
     loop {
-        // Skip leading whitespace
         while left.get(li).is_some_and(|c| c.is_ascii_whitespace()) {
             li += 1;
         }

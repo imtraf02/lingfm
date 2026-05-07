@@ -51,31 +51,34 @@ export function useSearch(
 	}, []);
 
 	// Filter search via Rust fzf
-	const runFilterSearch = useCallback(async (q: string, entries: FileEntry[]) => {
-		if (!q.trim()) return;
-		abortRef.current = false;
-		try {
-			const paths = entries.map((e) => e.path);
-			const matchedPaths = await tauriInvoke<string[]>("fzf_filter", {
-				paths,
-				query: q.trim(),
-			});
-			
-			if (!abortRef.current) {
-				// Reconstruct results based on fzf order, preserving folders first
-				const matched = matchedPaths
-					.map((p) => entries.find((e) => e.path === p))
-					.filter(Boolean) as FileEntry[];
-					
-				// Prioritize folders over files manually to match old behavior
-				const folders = matched.filter((e) => e.is_dir);
-				const files = matched.filter((e) => !e.is_dir);
-				setFilterResults([...folders, ...files]);
+	const runFilterSearch = useCallback(
+		async (q: string, entries: FileEntry[]) => {
+			if (!q.trim()) return;
+			abortRef.current = false;
+			try {
+				const paths = entries.map((e) => e.path);
+				const matchedPaths = await tauriInvoke<string[]>("fzf_filter", {
+					paths,
+					query: q.trim(),
+				});
+
+				if (!abortRef.current) {
+					// Reconstruct results based on fzf order, preserving folders first
+					const matched = matchedPaths
+						.map((p) => entries.find((e) => e.path === p))
+						.filter(Boolean) as FileEntry[];
+
+					// Prioritize folders over files manually to match old behavior
+					const folders = matched.filter((e) => e.is_dir);
+					const files = matched.filter((e) => !e.is_dir);
+					setFilterResults([...folders, ...files]);
+				}
+			} catch (e) {
+				console.error("Fzf filter error:", e);
 			}
-		} catch (e) {
-			console.error("Fzf filter error:", e);
-		}
-	}, []);
+		},
+		[],
+	);
 
 	useEffect(() => {
 		if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -103,7 +106,15 @@ export function useSearch(
 		return () => {
 			if (debounceRef.current) clearTimeout(debounceRef.current);
 		};
-	}, [query, mode, currentPath, localEntries, homePath, runDeepSearch, runFilterSearch]);
+	}, [
+		query,
+		mode,
+		currentPath,
+		localEntries,
+		homePath,
+		runDeepSearch,
+		runFilterSearch,
+	]);
 
 	// Reset deep results when path changes (except in global mode)
 	useEffect(() => {
@@ -113,19 +124,19 @@ export function useSearch(
 			setFilterResults([]);
 			setIsSearching(false);
 		}
-	}, [currentPath, mode]);
+	}, [mode]);
 
-	const setQuery = (q: string) => {
+	const setQuery = useCallback((q: string) => {
 		setQueryRaw(q);
-	};
+	}, []);
 
-	const clear = () => {
+	const clear = useCallback(() => {
 		abortRef.current = true;
 		setQueryRaw("");
 		setDeepResults([]);
 		setFilterResults([]);
 		setIsSearching(false);
-	};
+	}, []);
 
 	// Compute results
 	const results = useMemo(() => {
@@ -149,4 +160,3 @@ export function useSearch(
 		clear,
 	};
 }
-

@@ -1,6 +1,15 @@
 import type { FileEntry } from "@/types/fs";
 
-export const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "svg"];
+export const IMAGE_EXTENSIONS = [
+	"jpg",
+	"jpeg",
+	"png",
+	"gif",
+	"webp",
+	"bmp",
+	"ico",
+	"svg",
+];
 export const VIDEO_EXTENSIONS = ["mp4", "mov", "avi", "mkv", "webm"];
 export const AUDIO_EXTENSIONS = ["mp3", "wav", "flac", "ogg", "aac"];
 export const CODE_EXTENSIONS = [

@@ -1,9 +1,3 @@
-/// Async task scheduler for file operations – inspired by yazi-scheduler.
-///
-/// Architecture (simplified from yazi-scheduler/src/scheduler.rs):
-/// - Each task gets a unique ID
-/// - A channel-based worker runs tasks concurrently on a tokio thread pool
-/// - Progress is emitted as Tauri events so the frontend can show real-time progress bars
 use std::{
     path::{Path, PathBuf},
     process::Command,
@@ -14,40 +8,47 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc::{self, Sender};
 
-// ─── Task ID generator ────────────────────────────────────────────────────────
-
 static NEXT_ID: AtomicU32 = AtomicU32::new(1);
 fn next_id() -> u32 {
     NEXT_ID.fetch_add(1, AOrdering::Relaxed)
 }
 
-// ─── Task types (modelled after yazi-scheduler FileIn* variants) ─────────────
+#[derive(Debug, Clone)]
+pub enum ExtractMode {
+    Here,
+    To(PathBuf),
+}
 
 #[derive(Debug, Clone)]
 pub enum FileTask {
     Copy {
-        id:    u32,
-        from:  PathBuf,
-        to:    PathBuf,
+        id: u32,
+        from: PathBuf,
+        to: PathBuf,
         force: bool,
     },
     Move {
-        id:   u32,
+        id: u32,
         from: PathBuf,
-        to:   PathBuf,
+        to: PathBuf,
     },
     Delete {
-        id:     u32,
+        id: u32,
         target: PathBuf,
     },
     Trash {
-        id:     u32,
+        id: u32,
         target: PathBuf,
     },
     Rename {
-        id:       u32,
-        from:     PathBuf,
+        id: u32,
+        from: PathBuf,
         new_name: String,
+    },
+    Extract {
+        id: u32,
+        from: PathBuf,
+        mode: ExtractMode,
     },
 }
 
@@ -58,7 +59,8 @@ impl FileTask {
             | Self::Move { id, .. }
             | Self::Delete { id, .. }
             | Self::Trash { id, .. }
-            | Self::Rename { id, .. } => *id,
+            | Self::Rename { id, .. }
+            | Self::Extract { id, .. } => *id,
         }
     }
 
@@ -69,33 +71,30 @@ impl FileTask {
             Self::Delete { .. } => "delete",
             Self::Trash { .. } => "trash",
             Self::Rename { .. } => "rename",
+            Self::Extract { .. } => "extract",
         }
     }
 }
 
-// ─── Progress events (emitted to frontend via Tauri events) ──────────────────
-
 #[derive(Clone, Serialize)]
 pub struct TaskProgress {
-    pub id:        u32,
-    pub kind:      String,
-    pub name:      String,
-    pub total:     u64,  // total bytes to process
-    pub done:      u64,  // bytes processed so far
-    pub found:     u32,  // items discovered
-    pub processed: u32,  // items completed
-    pub failed:    u32,
+    pub id: u32,
+    pub kind: String,
+    pub name: String,
+    pub total: u64,
+    pub done: u64,
+    pub found: u32,
+    pub processed: u32,
+    pub failed: u32,
 }
 
 #[derive(Clone, Serialize)]
 pub struct TaskDone {
-    pub id:      u32,
-    pub kind:    String,
+    pub id: u32,
+    pub kind: String,
     pub success: bool,
-    pub errors:  Vec<String>,
+    pub errors: Vec<String>,
 }
-
-// ─── Scheduler ───────────────────────────────────────────────────────────────
 
 #[derive(Clone)]
 pub struct FmScheduler {
@@ -103,8 +102,6 @@ pub struct FmScheduler {
 }
 
 impl FmScheduler {
-    /// Spawn the background worker and return a scheduler handle.
-    /// Call this once during app setup and store in Tauri state.
     pub fn new(app: AppHandle) -> Self {
         let (tx, mut rx) = mpsc::channel::<FileTask>(64);
 
@@ -149,30 +146,43 @@ impl FmScheduler {
         let _ = self.tx.send(FileTask::Rename { id, from, new_name }).await;
         id
     }
-}
 
-// ─── Task executor ────────────────────────────────────────────────────────────
+    pub async fn submit_extract(&self, from: PathBuf, to: PathBuf) -> u32 {
+        let id = next_id();
+        let _ = self.tx
+            .send(FileTask::Extract {
+                id,
+                from,
+                mode: ExtractMode::To(to),
+            })
+            .await;
+        id
+    }
+
+    pub async fn submit_extract_here(&self, from: PathBuf) -> u32 {
+        let id = next_id();
+        let _ = self.tx
+            .send(FileTask::Extract {
+                id,
+                from,
+                mode: ExtractMode::Here,
+            })
+            .await;
+        id
+    }
+}
 
 async fn run_task(task: FileTask, app: AppHandle) {
     let id = task.id();
     let kind = task.kind().to_string();
 
     let result: Result<(), Vec<String>> = match task {
-        FileTask::Copy { from, to, force, .. } => {
-            run_copy(&from, &to, force, id, &app).await
-        }
-        FileTask::Move { from, to, .. } => {
-            run_move(&from, &to, id, &app).await
-        }
-        FileTask::Delete { target, .. } => {
-            run_delete(&target, id, &app).await
-        }
-        FileTask::Trash { target, .. } => {
-            run_trash(&target, id, &app).await
-        }
-        FileTask::Rename { from, new_name, .. } => {
-            run_rename(&from, &new_name, id, &app).await
-        }
+        FileTask::Copy { from, to, force, .. } => run_copy(&from, &to, force, id, &app).await,
+        FileTask::Move { from, to, .. } => run_move(&from, &to, id, &app).await,
+        FileTask::Delete { target, .. } => run_delete(&target, id, &app).await,
+        FileTask::Trash { target, .. } => run_trash(&target, id, &app).await,
+        FileTask::Rename { from, new_name, .. } => run_rename(&from, &new_name, id, &app).await,
+        FileTask::Extract { from, mode, .. } => run_extract(&from, mode, id, &app).await,
     };
 
     let (success, errors) = match result {
@@ -180,10 +190,96 @@ async fn run_task(task: FileTask, app: AppHandle) {
         Err(errs) => (false, errs),
     };
 
-    let _ = app.emit("task_done", TaskDone { id, kind, success, errors });
+    let _ = app.emit(
+        "task_done",
+        TaskDone {
+            id,
+            kind,
+            success,
+            errors,
+        },
+    );
 }
 
-// ─── Copy (with byte-level progress, similar to yazi worker.rs) ──────────────
+fn archive_stem(path: &Path) -> String {
+    let name = path.file_name().unwrap_or_default().to_string_lossy();
+    for ext in &[".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tar.lz4"] {
+        if let Some(stem) = name.strip_suffix(ext) {
+            return stem.to_string();
+        }
+    }
+    path.file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned()
+}
+
+async fn run_extract(
+    from: &Path,
+    mode: ExtractMode,
+    id: u32,
+    app: &AppHandle,
+) -> Result<(), Vec<String>> {
+    let name = from
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
+
+    emit_progress(app, id, "extract", &name, 0, 0, 1, 0, 0);
+
+    let resolved_to_dir = match mode {
+        ExtractMode::Here => from.parent().unwrap_or_else(|| Path::new("/")).to_path_buf(),
+        ExtractMode::To(dir) => dir,
+    };
+
+    let final_dest = resolved_to_dir.join(archive_stem(from));
+
+    if let Err(e) = std::fs::create_dir_all(&final_dest) {
+        return Err(vec![format!(
+            "Failed to create destination directory {}: {e}",
+            final_dest.display()
+        )]);
+    }
+
+    let cmd_name = if which::which("7zz").is_ok() {
+        "7zz"
+    } else {
+        "7z"
+    };
+
+    let from_buf = from.to_path_buf();
+    let extract_buf = final_dest.clone();
+    let cmd = cmd_name.to_string();
+
+    let output = tokio::task::spawn_blocking(move || {
+        Command::new(&cmd)
+            .args(["x", "-y", "-aoa", "-sccUTF-8"])
+            .arg(format!("-o{}", extract_buf.display()))
+            .arg(&from_buf)
+            .output()
+    })
+    .await
+    .unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, e)));
+
+    match output {
+        Ok(out) if out.status.success() => {
+            emit_progress(app, id, "extract", &name, 0, 0, 1, 1, 0);
+            Ok(())
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+            let stdout = String::from_utf8_lossy(&out.stdout).into_owned();
+            Err(vec![format!(
+                "7zip exited with code {}. Stderr: {} Stdout: {}",
+                out.status.code().unwrap_or(-1),
+                stderr,
+                stdout
+            )])
+        }
+        Err(e) => Err(vec![format!("Failed to start 7zip: {e}")]),
+    }
+}
 
 async fn run_copy(
     src: &Path,
@@ -192,19 +288,26 @@ async fn run_copy(
     id: u32,
     app: &AppHandle,
 ) -> Result<(), Vec<String>> {
-    // Collect all source files for progress tracking
     let files = collect_files(src);
     let total_bytes: u64 = files.iter().map(|(_, size)| *size).sum();
     let found = files.len() as u32;
     let mut done_bytes = 0u64;
     let mut processed = 0u32;
     let mut errors = vec![];
-    let name = src.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let name = src
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
 
     emit_progress(app, id, "copy", &name, total_bytes, 0, found, 0, 0);
 
     for (rel_path, _size) in &files {
-        let src_path = src.parent().unwrap_or(Path::new("/")).join(rel_path);
+        let src_path = if src.is_dir() {
+            src.join(rel_path)
+        } else {
+            src.to_path_buf()
+        };
         let dst_path = if src.is_dir() {
             dst.join(rel_path)
         } else {
@@ -227,7 +330,17 @@ async fn run_copy(
             Ok(bytes) => {
                 done_bytes += bytes;
                 processed += 1;
-                emit_progress(app, id, "copy", &name, total_bytes, done_bytes, found, processed, errors.len() as u32);
+                emit_progress(
+                    app,
+                    id,
+                    "copy",
+                    &name,
+                    total_bytes,
+                    done_bytes,
+                    found,
+                    processed,
+                    errors.len() as u32,
+                );
             }
             Err(e) => {
                 errors.push(format!("Cannot copy {}: {e}", src_path.display()));
@@ -235,35 +348,40 @@ async fn run_copy(
         }
     }
 
-    if errors.is_empty() { Ok(()) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
-// ─── Move ─────────────────────────────────────────────────────────────────────
-
 async fn run_move(src: &Path, dst: &Path, id: u32, app: &AppHandle) -> Result<(), Vec<String>> {
-    let name = src.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let name = src
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     emit_progress(app, id, "move", &name, 0, 0, 1, 0, 0);
 
-    // Try cheap rename first (same filesystem)
     if tokio::fs::rename(src, dst).await.is_ok() {
         emit_progress(app, id, "move", &name, 0, 0, 1, 1, 0);
         return Ok(());
     }
 
-    // Fallback: copy then delete
-    if let Err(e) = run_copy(src, dst, false, id, app).await {
-        return Err(e);
-    }
+    run_copy(src, dst, false, id, app).await?;
+
     if let Err(e) = tokio::fs::remove_dir_all(src).await {
         return Err(vec![format!("Cannot remove source after move: {e}")]);
     }
     Ok(())
 }
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
-
 async fn run_delete(target: &Path, id: u32, app: &AppHandle) -> Result<(), Vec<String>> {
-    let name = target.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let name = target
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     emit_progress(app, id, "delete", &name, 0, 0, 1, 0, 0);
 
     let result = if target.is_dir() {
@@ -274,58 +392,55 @@ async fn run_delete(target: &Path, id: u32, app: &AppHandle) -> Result<(), Vec<S
 
     if let Err(e) = result {
         if e.kind() == std::io::ErrorKind::PermissionDenied {
-            // Fallback to pkexec rm -rf for privileged deletion
             let status = Command::new("pkexec")
                 .arg("rm")
                 .arg("-rf")
                 .arg(target)
                 .status();
-            
-            match status {
-                Ok(s) if s.success() => return Ok(()),
-                Ok(_) => return Err(vec!["Authentication failed or cancelled".into()]),
-                Err(err) => return Err(vec![format!("Failed to launch pkexec: {err}")]),
-            }
+            return match status {
+                Ok(s) if s.success() => Ok(()),
+                Ok(_) => Err(vec!["Authentication failed or cancelled".into()]),
+                Err(e) => Err(vec![format!("Failed to launch pkexec: {e}")]),
+            };
         }
         return Err(vec![format!("Cannot delete {}: {e}", target.display())]);
     }
-    
+
+    emit_progress(app, id, "delete", &name, 0, 0, 1, 1, 0);
     Ok(())
 }
 
-// ─── Trash ────────────────────────────────────────────────────────────────────
-
 async fn run_trash(target: &Path, id: u32, app: &AppHandle) -> Result<(), Vec<String>> {
-    let name = target.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let name = target
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     emit_progress(app, id, "trash", &name, 0, 0, 1, 0, 0);
 
     let target_buf = target.to_path_buf();
     let result = tokio::task::spawn_blocking(move || {
-        trash::delete(&target_buf).map_err(|e| vec![format!("Cannot trash {}: {e}", target_buf.display())])
+        trash::delete(&target_buf)
+            .map_err(|e| vec![format!("Cannot trash {}: {e}", target_buf.display())])
     })
     .await
     .unwrap_or_else(|e| Err(vec![format!("Task panicked: {e}")]));
 
     if let Err(errs) = result {
-        // If trashing fails due to permission, offer to delete permanently as root
-        // Note: We can't easily trash as root to the user's trash.
-        // We'll try pkexec rm as a fallback for trashing privileged files too.
         let status = Command::new("pkexec")
             .arg("rm")
             .arg("-rf")
             .arg(target)
             .status();
-
-        match status {
-            Ok(s) if s.success() => return Ok(()),
-            _ => return Err(errs), // Return original trash error if pkexec fails/cancelled
-        }
+        return match status {
+            Ok(s) if s.success() => Ok(()),
+            _ => Err(errs),
+        };
     }
 
+    emit_progress(app, id, "trash", &name, 0, 0, 1, 1, 0);
     Ok(())
 }
-
-// ─── Rename ───────────────────────────────────────────────────────────────────
 
 async fn run_rename(
     from: &Path,
@@ -334,18 +449,21 @@ async fn run_rename(
     app: &AppHandle,
 ) -> Result<(), Vec<String>> {
     let to = from.parent().unwrap_or(Path::new("/")).join(new_name);
-    let name = from.file_name().unwrap_or_default().to_string_lossy().into_owned();
+    let name = from
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .into_owned();
     emit_progress(app, id, "rename", &name, 0, 0, 1, 0, 0);
 
     tokio::fs::rename(from, &to)
         .await
-        .map_err(|e| vec![format!("Cannot rename {}: {e}", from.display())])
+        .map_err(|e| vec![format!("Cannot rename {}: {e}", from.display())])?;
+
+    emit_progress(app, id, "rename", &name, 0, 0, 1, 1, 0);
+    Ok(())
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/// Recursively collect (relative_path, size) for all files under `root`.
-/// Returns `[(root_filename, size)]` if `root` is a file.
 fn collect_files(root: &Path) -> Vec<(PathBuf, u64)> {
     let mut result = vec![];
     if root.is_file() {
@@ -359,11 +477,15 @@ fn collect_files(root: &Path) -> Vec<(PathBuf, u64)> {
 }
 
 fn collect_recursive(base: &Path, dir: &Path, out: &mut Vec<(PathBuf, u64)>) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         let rel = path.strip_prefix(base).unwrap_or(&path).to_path_buf();
-        let Ok(meta) = entry.metadata() else { continue };
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
         if meta.is_dir() {
             collect_recursive(base, &path, out);
         } else {

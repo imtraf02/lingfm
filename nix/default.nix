@@ -11,22 +11,17 @@ pkgs.mkShell {
   name = "lingfm-dev";
 
   packages = with pkgs; [
-    # ── Rust ──────────────────────────────────────────────────────────────
     rustToolchain
 
-    # ── Node / pnpm ───────────────────────────────────────────────────────
     nodejs
     pnpm
 
-    # ── Tauri CLI ─────────────────────────────────────────────────────────
     cargo-tauri
 
-    # ── Build tools ───────────────────────────────────────────────────────
     pkg-config
     cmake
-    mold        # faster linker
+    mold
 
-    # ── GTK / WebKit (Tauri v2 Linux) ─────────────────────────────────────
     webkitgtk_4_1
     gtk3
     glib
@@ -39,16 +34,16 @@ pkgs.mkShell {
     xdotool
     librsvg
 
-    # ── Clipboard ─────────────────────────────────────────────────────────
-    wl-clipboard
+    gsettings-desktop-schemas
+    adwaita-icon-theme
 
-    # ── Dev utilities ─────────────────────────────────────────────────────
+    wl-clipboard
+    p7zip
+
     nixfmt-rfc-style
   ];
 
-  # Biến môi trường cần thiết cho Tauri / GTK
   env = {
-    # Để pkg-config tìm thấy thư viện
     PKG_CONFIG_PATH = with pkgs; lib.makeSearchPathOutput "dev" "lib/pkgconfig" [
       webkitgtk_4_1
       gtk3
@@ -59,8 +54,13 @@ pkgs.mkShell {
 
     WEBKIT_DISABLE_COMPOSITING_MODE = "1";
 
-    # Rust backtrace khi debug
     RUST_BACKTRACE = "1";
+
+    XDG_DATA_DIRS = with pkgs; lib.concatStringsSep ":" [
+      "${gtk3}/share/gsettings-schemas/${gtk3.name}"
+      "${gsettings-desktop-schemas}/share/gsettings-schemas/${gsettings-desktop-schemas.name}"
+      "$XDG_DATA_DIRS"
+    ];
   };
 
   shellHook = ''
@@ -68,7 +68,7 @@ pkgs.mkShell {
     echo "╔═══════════════════════════════════════╗"
     echo "║        LingFM Dev Shell               ║"
     echo "╠═══════════════════════════════════════╣"
-    echo "║  pnpm install   → install JS deps     ║"
+    echo "║  pnpm install   → install TS deps     ║"
     echo "║  pnpm tauri dev → start dev server    ║"
     echo "║  nix build      → build release       ║"
     echo "╚═══════════════════════════════════════╝"

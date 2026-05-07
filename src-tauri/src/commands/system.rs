@@ -73,3 +73,8 @@ pub async fn unwatch_dir(
     watcher.lock().await.stop();
     Ok(())
 }
+
+#[command]
+pub fn get_cli_args() -> Vec<String> {
+    std::env::args().collect()
+}

@@ -104,7 +104,7 @@ export function ImageThumb({
 	return (
 		<div
 			className={cn(
-				"w-11 h-11 rounded-lg overflow-hidden border transition-colors",
+				"h-11 w-11 overflow-hidden rounded-lg border transition-colors",
 				selected
 					? "border-[var(--ring)]"
 					: "border-[var(--border)] group-hover:border-[var(--ring)]",
@@ -113,7 +113,7 @@ export function ImageThumb({
 			<img
 				src={convertFileSrc(entry.path)}
 				alt={entry.name}
-				className="w-full h-full object-cover"
+				className="h-full w-full object-cover"
 				loading="lazy"
 			/>
 		</div>

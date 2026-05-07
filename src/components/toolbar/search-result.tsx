@@ -15,7 +15,7 @@ function highlightMatch(text: string, query: string) {
 	return (
 		<>
 			{text.slice(0, idx)}
-			<mark className="bg-primary/20 text-primary rounded-sm px-0.5">
+			<mark className="rounded-sm bg-primary/20 px-0.5 text-primary">
 				{text.slice(idx, idx + query.length)}
 			</mark>
 			{text.slice(idx + query.length)}
@@ -44,7 +44,7 @@ export function SearchResults({
 }: SearchResultsProps) {
 	if (results.length === 0) {
 		return (
-			<div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2">
+			<div className="flex h-48 flex-col items-center justify-center gap-2 text-muted-foreground">
 				<p className="text-sm">No results for "{query}"</p>
 				<p className="text-xs opacity-60">Try a different search term</p>
 			</div>
@@ -56,8 +56,8 @@ export function SearchResults({
 	if (mode === "filter") return null;
 
 	return (
-		<div className="p-2 flex flex-col gap-0.5">
-			<p className="text-[11px] text-muted-foreground px-2 py-1">
+		<div className="flex flex-col gap-0.5 p-2">
+			<p className="px-2 py-1 text-[11px] text-muted-foreground">
 				{results.length >= 500 ? "500+ results" : `${results.length} results`}{" "}
 				for "{query}"
 			</p>
@@ -65,33 +65,33 @@ export function SearchResults({
 				<div
 					key={entry.path}
 					onDoubleClick={() => onEntryDoubleClick(entry)}
-					className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-accent cursor-default transition-colors group select-none"
+					className="group flex cursor-default select-none items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-accent"
 				>
 					{entry.is_dir ? (
 						<FolderIcon
 							size={18}
-							className="shrink-0 text-blue-500 fill-blue-500/15"
+							className="shrink-0 fill-blue-500/15 text-blue-500"
 						/>
 					) : (
 						<FileIcon size={18} className="shrink-0 text-muted-foreground" />
 					)}
 
-					<div className="flex-1 min-w-0">
-						<p className="text-sm font-medium truncate">
+					<div className="min-w-0 flex-1">
+						<p className="truncate font-medium text-sm">
 							{highlightMatch(entry.name, query)}
 						</p>
-						<p className="text-[11px] text-muted-foreground truncate">
+						<p className="truncate text-[11px] text-muted-foreground">
 							{getParentPath(entry.path)}
 						</p>
 					</div>
 
-					<div className="text-[11px] text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+					<div className="shrink-0 text-[11px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
 						{entry.is_dir ? "Folder" : formatSize(entry.size)}
 					</div>
 				</div>
 			))}
 			{results.length >= 500 && (
-				<p className="text-[11px] text-muted-foreground/50 text-center py-2 italic">
+				<p className="py-2 text-center text-[11px] text-muted-foreground/50 italic">
 					Showing first 500 results. Refine your search for more specific
 					results.
 				</p>

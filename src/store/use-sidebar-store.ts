@@ -36,6 +36,6 @@ export const useSidebarStore = create<SidebarState>()(
 
 			toggleSidebar: () => set({ isSidebarOpen: !get().isSidebarOpen }),
 		}),
-		{ name: "lingfm-sidebar" }
-	)
+		{ name: "lingfm-sidebar" },
+	),
 );
