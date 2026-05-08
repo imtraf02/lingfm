@@ -9,13 +9,13 @@
 
 let
   pname   = "lingfm";
-  version = "0.1.0";
+  version = "0.1.1";
   src = if self != null then self else lib.cleanSource ./..;
 
   pnpmDeps = fetchPnpmDeps {
     inherit pname version src;
     fetcherVersion = 2;
-    hash = "sha256-ILPzv4tTwV3ztnzuZeNvlJYG9lKwL/P4XFjHM9Q+k6Y=";
+    hash = "sha256-wQbFSXEfE0tC4zwmlxJDYMExbHA8AsEAKOWn7ecRW2I=";
   };
 
   frontendDist = pkgs.stdenv.mkDerivation {
