@@ -179,14 +179,29 @@ function App() {
 				if (home) setHomePath(home);
 
 				const args = await tauriInvoke<string[]>("get_cli_args");
-				const argPath = args.find(
+				let argPath = args.find(
 					(a, i) =>
 						i > 0 &&
-						(a.startsWith("/") || a.startsWith("./") || a.startsWith("../")),
+						(a.startsWith("/") ||
+							a.startsWith("./") ||
+							a.startsWith("../") ||
+							a.startsWith("file://")),
 				);
 
-				if (argPath) await setCurrentPath(argPath);
-				else await setCurrentPath(home ?? "/");
+				if (argPath) {
+					if (argPath.startsWith("file://")) {
+						try {
+							argPath = new URL(argPath).pathname;
+							// On Windows, new URL().pathname might return "/C:/..."
+							if (/^\/[a-zA-Z]:/.test(argPath)) {
+								argPath = argPath.substring(1);
+							}
+						} catch {
+							argPath = argPath.replace("file://", "");
+						}
+					}
+					await setCurrentPath(argPath);
+				} else await setCurrentPath(home ?? "/");
 			} catch {
 				await setCurrentPath("/");
 			}

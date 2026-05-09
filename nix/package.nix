@@ -98,6 +98,7 @@ pkgs.rustPlatform.buildRustPackage {
     Terminal=false
     Type=Application
     Categories=System;FileManager;
+    MimeType=inode/directory;x-scheme-handler/file;
     StartupWMClass=lingfm
     EOF
 
