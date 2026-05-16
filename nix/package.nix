@@ -15,7 +15,7 @@ let
   pnpmDeps = fetchPnpmDeps {
     inherit pname version src;
     fetcherVersion = 2;
-    hash = "sha256-wQbFSXEfE0tC4zwmlxJDYMExbHA8AsEAKOWn7ecRW2I=";
+    hash = "sha256-egFSUcqDb1sMQrjUYFZ4bNBh2uzmb/+YE2ACNP15a3Q=";
   };
 
   frontendDist = pkgs.stdenv.mkDerivation {
