@@ -1,13 +1,19 @@
 import { useHotkeys } from "@tanstack/react-hotkeys";
 import { homeDir } from "@tauri-apps/api/path";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useShallow } from "zustand/react/shallow";
 import { FileExplorer } from "@/components/file-explorer/file-explorer";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
-import { SearchResults } from "@/components/toolbar/search-result";
+
+const SearchResults = lazy(() =>
+	import("@/components/toolbar/search-result").then((m) => ({
+		default: m.SearchResults,
+	})),
+);
+
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,23 +25,26 @@ import { useSidebarStore } from "@/store/use-sidebar-store";
 
 function App() {
 	const currentPath = useFileSystemStore((s) => s.currentPath);
-	const entries = useFileSystemStore((s) => s.entries);
+	const entries = useFileSystemStore(useShallow((s) => s.entries));
 	const isLoading = useFileSystemStore((s) => s.isLoading);
 	const error = useFileSystemStore((s) => s.error);
 	const setCurrentPath = useFileSystemStore((s) => s.setCurrentPath);
 	const goBack = useFileSystemStore((s) => s.goBack);
 	const goForward = useFileSystemStore((s) => s.goForward);
 	const refresh = useFileSystemStore((s) => s.refresh);
-	const selectedPaths = useFileSystemStore((s) => s.selectedPaths);
+	const selectedPaths = useFileSystemStore(useShallow((s) => s.selectedPaths));
 	const selectEntry = useFileSystemStore((s) => s.selectEntry);
 	const setHomePath = useFileSystemStore((s) => s.setHomePath);
 	const initWatcher = useFileSystemStore((s) => s.initWatcher);
+	const homePath = useFileSystemStore((s) => s.homePath);
 
 	const { toggleSidebar } = useSidebarStore();
 
 	const [searchOpen, setSearchOpen] = useState(false);
 	const [editPathOpen, setEditPathOpen] = useState(false);
 	const [isWayland, setIsWayland] = useState(false);
+
+	useDragDrop(currentPath, refresh);
 
 	const {
 		query,
@@ -46,7 +55,7 @@ function App() {
 		setMode,
 		results,
 		clear,
-	} = useSearch(currentPath, entries, useFileSystemStore.getState().homePath);
+	} = useSearch(currentPath, entries, homePath);
 
 	const openSearch = useCallback(
 		(initialMode: "filter" | "deep" | "global" = "filter") => {
@@ -68,6 +77,15 @@ function App() {
 	}, []);
 
 	const closeEditPath = useCallback(() => setEditPathOpen(false), []);
+
+	const handleNavigate = useCallback(
+		async (path: string) => {
+			closeSearch();
+			closeEditPath();
+			await setCurrentPath(path);
+		},
+		[closeSearch, closeEditPath, setCurrentPath],
+	);
 
 	const handleRefresh = async () => {
 		try {
@@ -153,32 +171,22 @@ function App() {
 	}, [results, isActive, selectEntry, selectedPaths]);
 
 	useEffect(() => {
-		closeSearch();
-		closeEditPath();
-	}, [closeSearch, closeEditPath]);
-
-	useEffect(() => {
 		let cleanup: (() => void) | undefined;
 		initWatcher().then((fn) => {
 			cleanup = fn;
 		});
-		return () => {
-			if (cleanup) cleanup();
-		};
-	}, [initWatcher]);
 
-	useDragDrop(currentPath, refresh);
-
-	useEffect(() => {
 		async function init() {
 			try {
-				const isW = await tauriInvoke<boolean>("is_wayland");
-				setIsWayland(isW);
+				const [isW, home, args] = await Promise.all([
+					tauriInvoke<boolean>("is_wayland"),
+					homeDir(),
+					tauriInvoke<string[]>("get_cli_args"),
+				]);
 
-				const home = await homeDir();
+				setIsWayland(isW);
 				if (home) setHomePath(home);
 
-				const args = await tauriInvoke<string[]>("get_cli_args");
 				let argPath = args.find(
 					(a, i) =>
 						i > 0 &&
@@ -188,26 +196,45 @@ function App() {
 							a.startsWith("file://")),
 				);
 
-				if (argPath) {
-					if (argPath.startsWith("file://")) {
-						try {
-							argPath = new URL(argPath).pathname;
-							// On Windows, new URL().pathname might return "/C:/..."
-							if (/^\/[a-zA-Z]:/.test(argPath)) {
-								argPath = argPath.substring(1);
-							}
-						} catch {
-							argPath = argPath.replace("file://", "");
+				if (argPath?.startsWith("file://")) {
+					try {
+						argPath = new URL(argPath).pathname;
+						if (/^\/[a-zA-Z]:/.test(argPath)) {
+							argPath = argPath.substring(1);
 						}
+						argPath = decodeURIComponent(argPath);
+					} catch {
+						argPath = argPath.replace("file://", "");
 					}
-					await setCurrentPath(argPath);
-				} else await setCurrentPath(home ?? "/");
+				}
+				await setCurrentPath(argPath ?? home ?? "/");
 			} catch {
 				await setCurrentPath("/");
 			}
 		}
 		init();
-	}, [setHomePath, setCurrentPath]);
+
+		return () => {
+			if (cleanup) cleanup();
+		};
+	}, [initWatcher, setHomePath, setCurrentPath]);
+
+	const handleOpenSelected = useCallback(async () => {
+		if (selectedPaths.size === 0) return;
+		const firstPath = Array.from(selectedPaths)[0];
+		const entry = results.find((r) => r.path === firstPath);
+		if (!entry) return;
+
+		if (entry.is_dir) handleNavigate(entry.path);
+		else {
+			try {
+				await tauriInvoke("open_entry", { path: entry.path });
+			} catch {
+				toast.error("Failed to open file");
+			}
+		}
+		closeSearch();
+	}, [selectedPaths, results, handleNavigate, closeSearch]);
 
 	const showDeepResults = isActive && mode === "deep";
 	const showFilterResults = isActive && mode === "filter";
@@ -232,6 +259,7 @@ function App() {
 						setMode={setMode}
 						isSearching={isSearching}
 						clearSearch={clear}
+						onSearchEnter={handleOpenSelected}
 					/>
 
 					<main className="flex-1 overflow-hidden bg-background">
@@ -248,7 +276,7 @@ function App() {
 											variant="outline"
 											size="sm"
 											className="w-fit"
-											onClick={() => setCurrentPath("/")}
+											onClick={() => handleNavigate("/")}
 										>
 											Go to Root (/)
 										</Button>
@@ -268,22 +296,30 @@ function App() {
 							)}
 
 							{!error && showDeepResults && (
-								<SearchResults
-									results={results}
-									query={query}
-									mode={mode}
-									onEntryDoubleClick={async (entry) => {
-										if (entry.is_dir) setCurrentPath(entry.path);
-										else {
-											try {
-												await openPath(entry.path);
-											} catch {
-												toast.error("Failed to open file");
+								<Suspense
+									fallback={
+										<div className="p-4 text-sm text-muted-foreground">
+											Loading results...
+										</div>
+									}
+								>
+									<SearchResults
+										results={results}
+										query={query}
+										mode={mode}
+										onEntryDoubleClick={async (entry) => {
+											if (entry.is_dir) handleNavigate(entry.path);
+											else {
+												try {
+													await tauriInvoke("open_entry", { path: entry.path });
+												} catch {
+													toast.error("Failed to open file");
+												}
 											}
-										}
-										closeSearch();
-									}}
-								/>
+											closeSearch();
+										}}
+									/>
+								</Suspense>
 							)}
 
 							{!showDeepResults && (
@@ -298,10 +334,10 @@ function App() {
 									<FileExplorer
 										entries={results}
 										onEntryDoubleClick={async (entry) => {
-											if (entry.is_dir) setCurrentPath(entry.path);
+											if (entry.is_dir) handleNavigate(entry.path);
 											else {
 												try {
-													await openPath(entry.path);
+													await tauriInvoke("open_entry", { path: entry.path });
 												} catch {
 													toast.error("Failed to open file");
 												}

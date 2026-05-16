@@ -30,6 +30,7 @@ in
     # XDG MIME: đặt LingFM làm file manager mặc định (tuỳ chọn)
     xdg.mime.defaultApplications = lib.mkDefault {
       "inode/directory" = "lingfm.desktop";
+      "x-scheme-handler/file" = "lingfm.desktop";
     };
   };
 }

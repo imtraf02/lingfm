@@ -1,74 +1,133 @@
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Folder } from "lucide-react";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { toast } from "sonner";
-import { PropertiesDialog } from "./properties-dialog";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { useFileSystemStore } from "@/store/use-file-system-store";
 import type { RichFileEntry as FileEntry } from "@/types/fs";
-import { BulkRenameDialog } from "./bulk-rename-dialog";
 import { EntryItem } from "./entry-item";
 import { FileExplorerContextMenu } from "./file-explorer-context-menu";
-import { NewFolderDialog } from "./new-folder-dialog";
 import { renderProgressToast } from "./progress-toast";
-import { RenameDialog } from "./rename-dialog";
 import { useFileExplorerHotkeys } from "./use-file-explorer-hotkeys";
 import { useFileExplorerSelection } from "./use-file-explorer-selection";
+
+const PropertiesDialog = lazy(() => import("./properties-dialog").then(m => ({ default: m.PropertiesDialog })));
+const BulkRenameDialog = lazy(() => import("./bulk-rename-dialog").then(m => ({ default: m.BulkRenameDialog })));
+const NewFolderDialog = lazy(() => import("./new-folder-dialog").then(m => ({ default: m.NewFolderDialog })));
+const RenameDialog = lazy(() => import("./rename-dialog").then(m => ({ default: m.RenameDialog })));
 
 interface FileExplorerProps {
 	entries: FileEntry[];
 	onEntryDoubleClick: (entry: FileEntry) => void;
 }
 
-const SectionLabel = ({ label }: { label: string }) => (
-	<p className="mt-0.5 mb-2 px-0.5 font-medium text-[10px] text-muted-foreground uppercase tracking-[0.07em] opacity-70">
-		{label}
-	</p>
-);
-
 interface EntryGridProps {
 	items: FileEntry[];
-	gridRef: React.RefObject<HTMLDivElement | null>;
 	selectedPaths: Set<string>;
 	onEntryDoubleClick: (entry: FileEntry) => void;
 	onSingleClick: (e: React.MouseEvent, entry: FileEntry) => void;
 	setPropertiesEntry: (entry: FileEntry | null) => void;
 	onRequestDelete: (entry: FileEntry) => void;
 	setRenamingEntry: (entry: FileEntry) => void;
+	isInTrash: boolean;
+	hasClipboard: boolean;
 }
 
 const EntryGrid = ({
 	items,
-	gridRef,
 	selectedPaths,
 	onEntryDoubleClick,
 	onSingleClick,
 	setPropertiesEntry,
 	onRequestDelete,
 	setRenamingEntry,
-}: EntryGridProps) => (
-	<div
-		ref={gridRef}
-		className="grid gap-0.5"
-		style={{ gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))" }}
-	>
-		{items.map((entry) => (
-			<EntryItem
-				key={entry.path}
-				entry={entry}
-				isSelected={selectedPaths.has(entry.path)}
-				isMultiSelected={
-					selectedPaths.has(entry.path) && selectedPaths.size > 1
-				}
-				onSingleClick={onSingleClick}
-				onDoubleClick={onEntryDoubleClick}
-				onOpenProperties={setPropertiesEntry}
-				onRequestDelete={onRequestDelete}
-				onRequestRename={setRenamingEntry}
-			/>
-		))}
-	</div>
-);
+	isInTrash,
+	hasClipboard,
+}: EntryGridProps) => {
+	const parentRef = useRef<HTMLDivElement>(null);
+	const [containerWidth, setContainerWidth] = useState(0);
+
+	useEffect(() => {
+		if (!parentRef.current) return;
+		const observer = new ResizeObserver((entries) => {
+			setContainerWidth(entries[0].contentRect.width);
+		});
+		observer.observe(parentRef.current);
+		return () => observer.disconnect();
+	}, []);
+
+	const COLUMN_WIDTH = 110;
+	const COLUMN_GAP = 8;
+	const ROW_HEIGHT = 120;
+	const cols = Math.max(1, Math.floor((containerWidth + COLUMN_GAP) / (COLUMN_WIDTH + COLUMN_GAP)));
+	const rowCount = Math.ceil(items.length / cols);
+
+	const rowVirtualizer = useVirtualizer({
+		count: rowCount,
+		getScrollElement: () => parentRef.current,
+		estimateSize: () => ROW_HEIGHT,
+		overscan: 5,
+	});
+
+	return (
+		<div
+			ref={parentRef}
+			className="relative h-full overflow-y-auto overflow-x-hidden p-4 scrollbar-thin"
+		>
+			<div
+				style={{
+					height: `${rowVirtualizer.getTotalSize()}px`,
+					width: "100%",
+					position: "relative",
+				}}
+			>
+				{rowVirtualizer.getVirtualItems().map((virtualRow) => {
+					const startIndex = virtualRow.index * cols;
+					const rowItems = items.slice(startIndex, startIndex + cols);
+
+					return (
+						<div
+							key={virtualRow.key}
+							className="absolute top-0 left-0 grid w-full gap-2"
+							style={{
+								height: `${ROW_HEIGHT}px`,
+								transform: `translateY(${virtualRow.start}px)`,
+								gridTemplateColumns: `repeat(${cols}, 1fr)`,
+							}}
+						>
+							{rowItems.map((entry) => (
+								<EntryItem
+									key={entry.path}
+									entry={entry}
+									isSelected={selectedPaths.has(entry.path)}
+									isMultiSelected={
+										selectedPaths.has(entry.path) && selectedPaths.size > 1
+									}
+									isInTrash={isInTrash}
+									hasClipboard={hasClipboard}
+									onSingleClick={onSingleClick}
+									onDoubleClick={onEntryDoubleClick}
+									onOpenProperties={setPropertiesEntry}
+									onRequestDelete={onRequestDelete}
+									onRequestRename={setRenamingEntry}
+								/>
+							))}
+						</div>
+					);
+				})}
+			</div>
+			{items.length === 0 && (
+				<div className="flex flex-col items-center justify-center gap-3 py-24">
+					<div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-muted/20">
+						<Folder size={22} className="text-muted-foreground opacity-40" />
+					</div>
+					<p className="text-muted-foreground text-xs opacity-60">This folder is empty</p>
+				</div>
+			)}
+		</div>
+	);
+};
 
 export function FileExplorer({
 	entries,
@@ -89,10 +148,26 @@ export function FileExplorer({
 	const gridRef = useRef<HTMLDivElement>(null);
 	const selectionBoxRef = useRef<HTMLDivElement>(null);
 
-	const folders = entries.filter((e) => e.is_dir);
-	const files = entries.filter((e) => !e.is_dir);
-	const visualEntries = useMemo(() => [...folders, ...files], [folders, files]);
-	const isInTrash = currentPath.includes(".local/share/Trash");
+	const { visualEntries } = useMemo(() => {
+		const folders = entries.filter((e) => e.is_dir);
+		const files = entries.filter((e) => !e.is_dir);
+		return { visualEntries: [...folders, ...files] };
+	}, [entries]);
+
+	const isInTrash = useMemo(
+		() => currentPath.includes(".local/share/Trash"),
+		[currentPath],
+	);
+	const hasClipboard = !!clipboard;
+
+	const clearSelection = useFileSystemStore((s) => s.clearSelection);
+	const pasteClipboard = useFileSystemStore((s) => s.pasteClipboard);
+	const deleteEntriesAction = useFileSystemStore((s) => s.deleteEntries);
+	const trashEntriesAction = useFileSystemStore((s) => s.trashEntries);
+	const extractEntriesAction = useFileSystemStore((s) => s.extractEntries);
+	const createDirectory = useFileSystemStore((s) => s.createDirectory);
+	const renameEntryAction = useFileSystemStore((s) => s.renameEntry);
+	const setBulkRenamingEntries = useFileSystemStore((s) => s.setBulkRenamingEntries);
 
 	const { isSelecting, handlePointerDown, isDragging } =
 		useFileExplorerSelection(gridRef, selectionBoxRef);
@@ -115,7 +190,7 @@ export function FileExplorer({
 			},
 		);
 		try {
-			await useFileSystemStore.getState().pasteClipboard((done, total) => {
+			await pasteClipboard((done, total) => {
 				toast.loading(renderProgressToast(`Pasting ${name}...`, done, total), {
 					id: toastId,
 					icon: null,
@@ -127,7 +202,7 @@ export function FileExplorer({
 		}
 	};
 
-	const handleDelete = React.useCallback(
+	const handleDelete = useCallback(
 		async (targets: FileEntry[]) => {
 			if (targets.length === 0) return;
 			const count = targets.length;
@@ -143,10 +218,10 @@ export function FileExplorer({
 			);
 			try {
 				if (isInTrash) {
-					await useFileSystemStore.getState().deleteEntries(paths);
+					await deleteEntriesAction(paths);
 					toast.success(`Permanently deleted ${name}`, { id: toastId });
 				} else {
-					await useFileSystemStore.getState().trashEntries(paths);
+					await trashEntriesAction(paths);
 					toast.success(`Moved ${name} to Trash`, { id: toastId });
 				}
 			} catch (err) {
@@ -156,7 +231,7 @@ export function FileExplorer({
 				);
 			}
 		},
-		[isInTrash],
+		[isInTrash, deleteEntriesAction, trashEntriesAction],
 	);
 
 	const handleExtract = async (targets: FileEntry[]) => {
@@ -164,7 +239,7 @@ export function FileExplorer({
 		const count = targets.length;
 		const name = count === 1 ? targets[0].name : `${count} archives`;
 		const paths = targets.map((t) => t.path);
-		toast.promise(useFileSystemStore.getState().extractEntries(paths), {
+		toast.promise(extractEntriesAction(paths), {
 			loading: `Extracting ${name}...`,
 			success: `Started extraction of ${name}`,
 			error: `Failed to start extraction: ${name}`,
@@ -193,7 +268,7 @@ export function FileExplorer({
 		lastClickedPathRef,
 	});
 
-	const handleSingleClick = React.useCallback(
+	const handleSingleClick = useCallback(
 		(e: React.MouseEvent, entry: FileEntry) => {
 			if (e.shiftKey && lastClickedPathRef.current) {
 				const startIndex = visualEntries.findIndex(
@@ -221,7 +296,7 @@ export function FileExplorer({
 		[visualEntries],
 	);
 
-	const handleRequestDelete = React.useCallback(
+	const handleRequestDelete = useCallback(
 		(entry: FileEntry) => {
 			const state = useFileSystemStore.getState();
 			if (state.selectedPaths.has(entry.path)) {
@@ -243,61 +318,27 @@ export function FileExplorer({
 					render={
 						<div
 							className={cn(
-								"relative min-h-full outline-none",
+								"relative h-full min-h-[400px] outline-none",
 								isSelecting ? "select-none" : "",
 							)}
 							onPointerDown={handlePointerDown}
 							onClick={(e) => {
 								if (isDragging.current) return;
 								if (e.target === e.currentTarget)
-									useFileSystemStore.getState().clearSelection();
+									clearSelection();
 							}}
 						>
-							<div className="space-y-5 p-4">
-								{folders.length > 0 && (
-									<section>
-										<SectionLabel label="Folders" />
-										<EntryGrid
-											items={folders}
-											gridRef={gridRef}
-											selectedPaths={selectedPaths}
-											onEntryDoubleClick={onEntryDoubleClick}
-											onSingleClick={handleSingleClick}
-											setPropertiesEntry={setPropertiesEntry}
-											onRequestDelete={handleRequestDelete}
-											setRenamingEntry={setRenamingEntry}
-										/>
-									</section>
-								)}
-								{files.length > 0 && (
-									<section>
-										{folders.length > 0 && <SectionLabel label="Files" />}
-										<EntryGrid
-											items={files}
-											gridRef={gridRef}
-											selectedPaths={selectedPaths}
-											onEntryDoubleClick={onEntryDoubleClick}
-											onSingleClick={handleSingleClick}
-											setPropertiesEntry={setPropertiesEntry}
-											onRequestDelete={handleRequestDelete}
-											setRenamingEntry={setRenamingEntry}
-										/>
-									</section>
-								)}
-								{entries.length === 0 && (
-									<div className="flex flex-col items-center justify-center gap-3 py-24">
-										<div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-[var(--muted)]">
-											<Folder
-												size={22}
-												className="text-muted-foreground opacity-40"
-											/>
-										</div>
-										<p className="text-muted-foreground text-xs opacity-60">
-											This folder is empty
-										</p>
-									</div>
-								)}
-							</div>
+							<EntryGrid
+								items={visualEntries}
+								selectedPaths={selectedPaths}
+								onEntryDoubleClick={onEntryDoubleClick}
+								onSingleClick={handleSingleClick}
+								setPropertiesEntry={setPropertiesEntry}
+								onRequestDelete={handleRequestDelete}
+								setRenamingEntry={setRenamingEntry}
+								isInTrash={isInTrash}
+								hasClipboard={hasClipboard}
+							/>
 							{isSelecting && (
 								<div
 									ref={selectionBoxRef}
@@ -318,42 +359,44 @@ export function FileExplorer({
 				/>
 			</ContextMenu>
 
-			<NewFolderDialog
-				open={newFolderOpen}
-				onClose={() => setNewFolderOpen(false)}
-				onCreate={async (name) => {
-					useFileSystemStore.getState().createDirectory(name);
-					setNewFolderOpen(false);
-				}}
-			/>
-			{renamingEntry && (
-				<RenameDialog
-					open={!!renamingEntry}
-					initialName={renamingEntry.name}
-					onClose={() => setRenamingEntry(null)}
-					onRename={async (name) => {
-						await useFileSystemStore.getState().renameEntry(renamingEntry.path, name);
-						setRenamingEntry(null);
+			<Suspense fallback={null}>
+				<NewFolderDialog
+					open={newFolderOpen}
+					onClose={() => setNewFolderOpen(false)}
+					onCreate={async (name) => {
+						createDirectory(name);
+						setNewFolderOpen(false);
 					}}
 				/>
-			)}
-			<BulkRenameDialog
-				open={bulkRenamingEntries.length > 0}
-				entries={bulkRenamingEntries}
-				onClose={() => useFileSystemStore.getState().setBulkRenamingEntries([])}
-				onRename={async (mappings) => {
-					for (const m of mappings)
-						await useFileSystemStore.getState().renameEntry(m.from, m.to);
-					useFileSystemStore.getState().setBulkRenamingEntries([]);
-				}}
-			/>
-			{propertiesEntry && (
-				<PropertiesDialog
-					open={!!propertiesEntry}
-					entry={propertiesEntry}
-					onClose={() => setPropertiesEntry(null)}
+				{renamingEntry && (
+					<RenameDialog
+						open={!!renamingEntry}
+						initialName={renamingEntry.name}
+						onClose={() => setRenamingEntry(null)}
+						onRename={async (name) => {
+							await renameEntryAction(renamingEntry.path, name);
+							setRenamingEntry(null);
+						}}
+					/>
+				)}
+				<BulkRenameDialog
+					open={bulkRenamingEntries.length > 0}
+					entries={bulkRenamingEntries}
+					onClose={() => setBulkRenamingEntries([])}
+					onRename={async (mappings) => {
+						for (const m of mappings)
+							await renameEntryAction(m.from, m.to);
+						setBulkRenamingEntries([]);
+					}}
 				/>
-			)}
+				{propertiesEntry && (
+					<PropertiesDialog
+						open={!!propertiesEntry}
+						entry={propertiesEntry}
+						onClose={() => setPropertiesEntry(null)}
+					/>
+				)}
+			</Suspense>
 		</>
 	);
 }

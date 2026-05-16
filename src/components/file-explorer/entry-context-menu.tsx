@@ -218,7 +218,7 @@ export function EntryContextMenu({
 								await invoke("copy_files_to_system_clipboard", { paths });
 							} catch (err) {
 								console.warn("[lingfm] system clipboard copy failed:", err);
-								navigator.clipboard.writeText(paths.join("\n")).catch(() => {});
+								navigator.clipboard.writeText(paths.join("\n")).catch(() => { });
 							}
 							toast.success(`Copied ${name}`);
 						}}
@@ -246,7 +246,7 @@ export function EntryContextMenu({
 								await invoke("copy_files_to_system_clipboard", { paths });
 							} catch (err) {
 								console.warn("[lingfm] system clipboard cut failed:", err);
-								navigator.clipboard.writeText(paths.join("\n")).catch(() => {});
+								navigator.clipboard.writeText(paths.join("\n")).catch(() => { });
 							}
 							toast.success(`Cut ${name}`);
 						}}

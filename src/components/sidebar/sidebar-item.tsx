@@ -72,9 +72,9 @@ export function SidebarItem({
 				render={
 					<Button
 						variant={isActive ? "default" : "ghost"}
-						className={cn("w-full transition-all duration-150", {
+						className={cn("w-full transition-all duration-150 justify-start h-8 px-2.5 focus-visible:ring-inset focus-visible:ring-2", {
 							"text-muted-foreground": !isActive,
-							"scale-[1.02] border-primary/50 bg-accent/80 ring-2 ring-primary":
+							"scale-[1.01] border-primary/30 bg-accent/80 ring-2 ring-primary ring-inset":
 								isOver,
 						})}
 						onClick={onClick}

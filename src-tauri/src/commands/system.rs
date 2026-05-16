@@ -78,3 +78,59 @@ pub async fn unwatch_dir(
 pub fn get_cli_args() -> Vec<String> {
     std::env::args().collect()
 }
+
+/// Open a file using the system default application.
+/// Mirrors yazi's `open` opener rule:
+///   Linux:   xdg-open %s1  (orphan — detached from parent process)
+///   macOS:   open %s
+///   Windows: start "" %s1  (orphan)
+#[command]
+pub fn open_entry(path: String) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| format!("xdg-open failed: {e}"))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| format!("open failed: {e}"))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "", &path])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map_err(|e| format!("start failed: {e}"))?;
+    }
+
+    Ok(())
+}
+
+#[command]
+pub fn open_with(path: String, cmd: String) -> Result<(), String> {
+    std::process::Command::new(&cmd)
+        .arg(&path)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to run '{cmd}': {e}"))?;
+
+    Ok(())
+}

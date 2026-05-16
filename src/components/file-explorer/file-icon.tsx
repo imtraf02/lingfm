@@ -1,6 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { FileEntry } from "@/types/fs";
+import type { RichFileEntry as FileEntry } from "@/types/fs";
 import { FILE_TYPE_COLOR, type FileType } from "./utils";
 
 export function FolderSvgIcon({ selected }: { selected: boolean }) {
@@ -101,21 +102,45 @@ export function ImageThumb({
 	entry: FileEntry;
 	selected: boolean;
 }) {
+	const [src, setSrc] = useState<string | null>(null);
+	const containerRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting) {
+					setSrc(convertFileSrc(entry.path));
+					observer.disconnect();
+				}
+			},
+			{ rootMargin: "100px" },
+		);
+
+		if (containerRef.current) {
+			observer.observe(containerRef.current);
+		}
+
+		return () => observer.disconnect();
+	}, [entry.path]);
+
 	return (
 		<div
+			ref={containerRef}
 			className={cn(
-				"h-11 w-11 overflow-hidden rounded-lg border transition-colors",
+				"h-11 w-11 overflow-hidden rounded-lg border transition-colors bg-muted/30",
 				selected
 					? "border-[var(--ring)]"
 					: "border-[var(--border)] group-hover:border-[var(--ring)]",
 			)}
 		>
-			<img
-				src={convertFileSrc(entry.path)}
-				alt={entry.name}
-				className="h-full w-full object-cover"
-				loading="lazy"
-			/>
+			{src && (
+				<img
+					src={src}
+					alt={entry.name}
+					className="h-full w-full object-cover animate-in fade-in duration-300"
+					loading="lazy"
+				/>
+			)}
 		</div>
 	);
 }

@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name={{name}}
+{{#if comment}}
+Comment={{comment}}
+{{else}}
+Comment=A modern file manager
+{{/if}}
+Exec={{exec}} %U
+Icon={{icon}}
+Terminal=false
+Categories=System;FileManager;Utility;
+MimeType=inode/directory;x-scheme-handler/file;
+StartupNotify=true
+StartupWMClass=lingfm

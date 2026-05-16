@@ -31,6 +31,7 @@ in
       enable = true;
       defaultApplications = {
         "inode/directory" = [ "lingfm.desktop" ];
+        "x-scheme-handler/file" = [ "lingfm.desktop" ];
       };
     };
   };

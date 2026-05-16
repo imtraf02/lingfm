@@ -180,7 +180,7 @@ export function Sidebar({ onSearch }: SidebarProps) {
 						)}
 					</CollapsibleSection>
 
-					<CollapsibleSection title="Network" defaultOpen={false}>
+					<CollapsibleSection title="Network" defaultOpen={true}>
 						{networkItems.map((item) => (
 							<SidebarItem
 								key={item.path}

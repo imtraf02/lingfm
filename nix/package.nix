@@ -93,12 +93,13 @@ pkgs.rustPlatform.buildRustPackage {
     [Desktop Entry]
     Name=LingFM
     Comment=A modern file manager
-    Exec=${pname} %u
+    Exec=${pname} %U
     Icon=${pname}
     Terminal=false
     Type=Application
-    Categories=System;FileManager;
+    Categories=System;FileManager;Utility;
     MimeType=inode/directory;x-scheme-handler/file;
+    StartupNotify=true
     StartupWMClass=lingfm
     EOF
 

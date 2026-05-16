@@ -58,7 +58,10 @@ In your home-manager configuration file (e.g., `home.nix`):
     inputs.lingfm.homeModules.default
   ];
 
-  programs.lingfm.enable = true;
+  programs.lingfm = {
+    enable = true;
+    defaultFileManager = true;
+  };
 }
 ```
 
@@ -75,6 +78,25 @@ In your `configuration.nix`:
   programs.lingfm.enable = true;
 }
 ```
+
+## Default file manager
+
+LingFM ships a Linux desktop entry for `inode/directory` and `file://` URLs.
+For non-Nix installs, set it as the default file manager after installing the
+desktop entry:
+
+```bash
+scripts/set-default-file-manager.sh lingfm.desktop
+```
+
+For Tauri `.deb`/`.rpm` bundles, the custom desktop template is included at
+`src-tauri/linux/lingfm.desktop.in`.
+
+Third-party apps that open folders through `xdg-open`, `gio open`, or the XDG
+MIME database will use LingFM after this association is set. Apps that open an
+import dialog through `xdg-desktop-portal` need a dedicated FileChooser portal
+backend; that is a separate D-Bus service and is not the same mechanism as the
+default file manager association.
 
 ## 🛠 Tech Stack
 - **Frontend:** React 19, Tailwind CSS 4, Zustand, TanStack Query

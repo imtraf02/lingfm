@@ -37,6 +37,7 @@ interface HeaderProps {
 	setMode: (m: "filter" | "deep" | "global") => void;
 	isSearching: boolean;
 	clearSearch: () => void;
+	onSearchEnter?: () => void;
 }
 
 const appWindow = getCurrentWindow();
@@ -55,6 +56,7 @@ export function Header({
 	setMode,
 	isSearching,
 	clearSearch,
+	onSearchEnter,
 }: HeaderProps) {
 	const currentPath = useFileSystemStore((s) => s.currentPath);
 	const setCurrentPath = useFileSystemStore((s) => s.setCurrentPath);
@@ -98,6 +100,7 @@ export function Header({
 							onClear={clearSearch}
 							onClose={closeSearch}
 							currentPath={currentPath}
+							onEnter={onSearchEnter}
 						/>
 					</div>
 				) : editPathOpen ? (

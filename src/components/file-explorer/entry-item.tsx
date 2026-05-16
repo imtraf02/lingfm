@@ -15,6 +15,8 @@ interface EntryItemProps {
 	entry: FileEntry;
 	isSelected: boolean;
 	isMultiSelected: boolean;
+	isInTrash: boolean;
+	hasClipboard: boolean;
 	onSingleClick: (e: React.MouseEvent, entry: FileEntry) => void;
 	onDoubleClick: (entry: FileEntry) => void;
 	onOpenProperties: (entry: FileEntry) => void;
@@ -26,19 +28,16 @@ export const EntryItem = memo(function EntryItem({
 	entry,
 	isSelected,
 	isMultiSelected,
+	isInTrash,
+	hasClipboard,
 	onSingleClick,
 	onDoubleClick,
 	onOpenProperties,
 	onRequestDelete,
 	onRequestRename,
 }: EntryItemProps) {
-	const starred = useSidebarStore((s) =>
-		s.starred.some((item) => item.path === entry.path),
-	);
-	const isInTrash = useFileSystemStore((s) =>
-		s.currentPath.includes(".local/share/Trash"),
-	);
-	const hasClipboard = useFileSystemStore((s) => !!s.clipboard);
+	// O(1) Set lookup — starredPaths is kept in sync with starred array
+	const starred = useSidebarStore((s) => s.starredPaths.has(entry.path));
 	const [isOver, setIsOver] = useState(false);
 
 	const type = getFileType(entry);
@@ -148,7 +147,7 @@ export const EntryItem = memo(function EntryItem({
 						<div className="relative mb-2 flex h-12 w-12 items-center justify-center">
 							{entry.is_dir ? (
 								<FolderSvgIcon selected={isSelected} />
-							) : isImage ? (
+							) : isImage && !isInTrash ? (
 								<ImageThumb entry={entry} selected={isSelected} />
 							) : (
 								<FileSvgIcon type={type} ext={ext} selected={isSelected} />

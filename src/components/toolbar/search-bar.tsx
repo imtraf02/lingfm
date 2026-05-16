@@ -11,6 +11,7 @@ interface SearchBarProps {
 	onClear: () => void;
 	onClose: () => void;
 	currentPath: string;
+	onEnter?: () => void;
 }
 
 export function SearchBar({
@@ -22,6 +23,7 @@ export function SearchBar({
 	onClear,
 	onClose,
 	currentPath,
+	onEnter,
 }: SearchBarProps) {
 	const inputRef = useRef<HTMLInputElement>(null);
 	const currentFolder =
@@ -35,6 +37,8 @@ export function SearchBar({
 		if (e.key === "Escape") {
 			onClear();
 			onClose();
+		} else if (e.key === "Enter") {
+			onEnter?.();
 		}
 	};
 
